@@ -5,6 +5,7 @@ from fastapi.staticfiles import StaticFiles
 import socketio
 import asyncio
 import json
+import os
 from locust_runner import LocustRunner
 import logging
 
@@ -52,7 +53,7 @@ class PortManager:
 
 port_manager = PortManager()
 
-def generate_custom_locustfile(http_method: str, route: str, wait_time: float, json_payload: dict = None) -> str:
+def generate_custom_locustfile(http_method: str, route: str, wait_time: float, json_payload: dict = None, log_file_path: str = None) -> str:
     """Generate a custom locustfile based on user parameters"""
     
     # Build the request code based on HTTP method
@@ -71,8 +72,19 @@ def generate_custom_locustfile(http_method: str, route: str, wait_time: float, j
         request_code = f'response = self.client.get("{route}")  # Fallback to GET'
 
     # Generate the complete locustfile
+    log_code = ""
+    if log_file_path:
+        log_code = f'''
+            # Log to temporary file
+            import datetime
+            with open(r"{log_file_path}", "a", encoding="utf-8") as log_file:
+                timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+                log_file.write(f"{{timestamp}} - {{response.status_code}} - {{response.url}} - {{response.elapsed.total_seconds():.3f}}s\\n")
+                log_file.flush()'''
+    
     locustfile_content = f'''from locust import HttpUser, task, between
 import json
+import datetime
 
 class CustomUser(HttpUser):
     wait_time = between({wait_time}, {wait_time + 1})
@@ -82,6 +94,7 @@ class CustomUser(HttpUser):
         """Custom task generated from user input"""
         try:
             {request_code}
+            {log_code}
             
             # Log response details
             print(f"{{self.__class__.__name__}} - {{response.status_code}} - {{response.url}}")
@@ -103,6 +116,26 @@ class CustomUser(HttpUser):
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
+
+@app.get("/logs/{session_id}")
+async def get_logs(session_id: str):
+    """Get the trailing log for a specific session"""
+    runner = runners.get(session_id)
+    if not runner:
+        return {"error": "Session not found"}
+    
+    log_file_path = getattr(runner, '_session_log_file', None)
+    if not log_file_path or not os.path.exists(log_file_path):
+        return {"logs": []}
+    
+    try:
+        with open(log_file_path, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+            # Return last 100 lines
+            return {"logs": [line.strip() for line in lines[-100:]]}
+    except Exception as e:
+        logger.error(f"Error reading log file: {e}")
+        return {"logs": [], "error": str(e)}
 
 async def stream_locust_stats(sid):
     runner = runners.get(sid)
@@ -129,6 +162,16 @@ async def disconnect(sid):
     if sid in runners:
         runner = runners[sid]
         await runner.stop()
+        
+        # Clean up session log file
+        session_log_file = getattr(runner, '_session_log_file', None)
+        if session_log_file:
+            try:
+                os.unlink(session_log_file)
+                logger.info(f"Cleaned up session log file: {session_log_file}")
+            except Exception as e:
+                logger.warning(f"Failed to clean up session log file: {e}")
+        
         del runners[sid]
         port_manager.release_port(sid)
         logger.info(f"Released port for session {sid}")
@@ -162,12 +205,21 @@ async def start_load_test(sid, data):
                     await sio.emit('error', {'message': 'Invalid JSON payload.'}, to=sid)
                     return
 
-            # Generate custom locustfile for this session
+            # Create a temporary log file for this session
+            import tempfile
+            fd_log, log_file_path = tempfile.mkstemp(suffix='.log', prefix=f'port_{runners[sid]._locust_port}_')
+            os.close(fd_log)
+            
+            # Generate custom locustfile with logging
             locustfile_content = generate_custom_locustfile(
-                http_method, route, wait_time, parsed_json
+                http_method, route, wait_time, parsed_json, log_file_path
             )
             
+            # Start the runner with the custom locustfile
             await runner.start(host, num_users, spawn_rate, locustfile_content)
+            
+            # Store the log file path in the runner so we can access it later
+            runner._session_log_file = log_file_path
             sio.start_background_task(stream_locust_stats, sid)
 
         except Exception as e:

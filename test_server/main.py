@@ -184,19 +184,13 @@ async def json_endpoint(payload: JsonPayload):
     # Simulate some processing time
     await asyncio.sleep(0.1)
     
-    # Add timestamp if not provided
-    if not payload.timestamp:
-        payload.timestamp = time.time()
-    
     return JSONResponse(
         status_code=200,
         content={
             "status": "success",
             "message": "JSON payload processed successfully",
             "received_data": {
-                "original_message": payload.message,
-                "data": payload.data,
-                "timestamp": payload.timestamp,
+                "data": payload,
                 "processed_at": time.time()
             },
             "request_id": request_count

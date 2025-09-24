@@ -23,6 +23,7 @@ class LocustRunner:
     async def start(self, host: str, num_users: int, spawn_rate: int, custom_locustfile: str = None) -> None:
         await self.stop()
         
+        
         # Use custom locustfile if provided, otherwise use default
         locustfile_path = "locustfile.py"
         if custom_locustfile:
@@ -117,6 +118,8 @@ class LocustRunner:
                 logger.warning(f"Failed to clean up temporary locustfile: {e}")
             finally:
                 self._temp_locustfile = None
+                
+
 
     async def stats(self):
         if not self._stats_queue:
@@ -144,23 +147,12 @@ class LocustRunner:
                                 num_failures = total_stats.get("num_failures", 0)
                                 num_requests = total_stats.get("num_requests", 0)
                                 fail_ratio = (num_failures / num_requests * 100) if num_requests > 0 else 0
-                                
-                                # Poll the custom endpoint for status codes
-                                status_codes = {}
-                                try:
-                                    async with session.get(f"http://localhost:{self._locust_port}/custom-stats") as status_response:
-                                        if status_response.status == 200:
-                                            status_data = await status_response.json()
-                                            status_codes = status_data.get("status_codes", {})
-                                except Exception as e:
-                                    logger.debug(f"Could not poll /custom-stats endpoint: {e}")
 
                                 payload = {
                                     "user_count": data.get("user_count", 0),
                                     "total_rps": total_stats.get("current_rps", 0),
                                     "fail_ratio": fail_ratio,
                                     "total_avg_response_time": total_stats.get("avg_response_time", 0),
-                                    "status_codes": status_codes
                                 }
                                 
                                 await self._stats_queue.put(payload)

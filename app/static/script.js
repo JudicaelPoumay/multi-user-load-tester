@@ -8,8 +8,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const jsonFileInput = document.getElementById('json_file');
     const jsonPayloadTextarea = document.getElementById('json_payload');
     const clearJsonBtn = document.getElementById('clear-json');
+    const logContainer = document.getElementById('log-container');
 
     let rpsChart, responseTimeChart;
+    let logPollingInterval = null;
     const chartData = {
         labels: [],
         rps: [],
@@ -143,12 +145,16 @@ document.addEventListener('DOMContentLoaded', () => {
         startBtn.disabled = true;
         stopBtn.disabled = false;
         errorContainer.style.display = 'none';
+        document.getElementById('error-report-container').innerHTML = ''; // Clear previous errors
+        if (logContainer) logContainer.innerHTML = ''; // Clear previous logs
+        startLogPolling(); // Start polling logs
     });
 
     stopBtn.addEventListener('click', () => {
         socket.emit('stop_load_test');
         startBtn.disabled = false;
         stopBtn.disabled = true;
+        stopLogPolling(); // Stop polling logs
     });
 
     socket.on('connect', () => {
@@ -168,6 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
         errorContainer.style.display = 'block';
         startBtn.disabled = false;
         stopBtn.disabled = true;
+        stopLogPolling(); // Stop polling logs on error
     });
 
     const updateUI = (data) => {
@@ -181,6 +188,67 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const now = new Date();
         updateCharts(now, data.total_rps, data.total_avg_response_time);
+
+        if (data.errors && data.errors.length > 0) {
+            renderErrors(data.errors);
+        }
+    };
+
+    const renderErrors = (errors) => {
+        const errorContainer = document.getElementById('error-report-container');
+        let errorsHTML = '<h2>Error Report</h2><table><tr><th>Occurrences</th><th>Error</th></tr>';
+        errors.forEach(error => {
+            errorsHTML += `<tr><td>${error.occurrences}</td><td><pre>${error.error}</pre></td></tr>`;
+        });
+        errorsHTML += '</table>';
+        errorContainer.innerHTML = errorsHTML;
+    };
+
+    const startLogPolling = () => {
+        if (logPollingInterval) {
+            clearInterval(logPollingInterval);
+        }
+        
+        const pollLogs = async () => {
+            try {
+                const response = await fetch(`/logs/${socket.id}`);
+                const data = await response.json();
+                
+                if (data.logs && data.logs.length > 0) {
+                    displayLogs(data.logs);
+                }
+            } catch (error) {
+                console.error('Error polling logs:', error);
+            }
+        };
+        
+        // Poll every 2 seconds
+        logPollingInterval = setInterval(pollLogs, 2000);
+        pollLogs(); // Initial call
+    };
+
+    const stopLogPolling = () => {
+        if (logPollingInterval) {
+            clearInterval(logPollingInterval);
+            logPollingInterval = null;
+        }
+    };
+
+    const displayLogs = (logs) => {
+        if (!logContainer) return;
+        
+        let logsHTML = '<h3>Request Log (Last 100 entries)</h3><div class="log-content">';
+        logs.forEach(log => {
+            logsHTML += `<div class="log-line">${log}</div>`;
+        });
+        logsHTML += '</div>';
+        logContainer.innerHTML = logsHTML;
+        
+        // Auto-scroll to bottom
+        const logContent = logContainer.querySelector('.log-content');
+        if (logContent) {
+            logContent.scrollTop = logContent.scrollHeight;
+        }
     };
 
     // JSON file upload handling

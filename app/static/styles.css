@@ -211,3 +211,73 @@ canvas {
     text-align: center;
     display: none; /* Hidden by default */
 }
+
+.error-report {
+    margin-top: 30px;
+}
+
+.error-report h2 {
+    text-align: left;
+    color: #dc3545;
+}
+
+.error-report table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+.error-report th,
+.error-report td {
+    border: 1px solid #dee2e6;
+    padding: 12px;
+    text-align: left;
+}
+
+.error-report th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+}
+
+.error-report td pre {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    margin: 0;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+}
+
+.log-container {
+    margin-top: 30px;
+}
+
+.log-container h3 {
+    text-align: left;
+    color: #007bff;
+    margin-bottom: 15px;
+}
+
+.log-content {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 15px;
+    max-height: 400px;
+    overflow-y: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.log-line {
+    padding: 2px 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.log-line:last-child {
+    border-bottom: none;
+}
+
+.log-line:hover {
+    background-color: #e9ecef;
+}
