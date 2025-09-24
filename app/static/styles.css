@@ -201,6 +201,17 @@ canvas {
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
+#chart-warning {
+    color: #721c24;
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    padding: 15px;
+    border-radius: 4px;
+    margin-top: 20px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
 .error-message {
     color: #dc3545;
     background-color: #f8d7da;

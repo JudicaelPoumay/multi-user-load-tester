@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const stopBtn = document.getElementById('stop-btn');
     const statsDiv = document.getElementById('stats');
     const errorContainer = document.getElementById('error-container');
+    const chartWarning = document.getElementById('chart-warning');
     const jsonFileInput = document.getElementById('json_file');
     const jsonPayloadTextarea = document.getElementById('json_payload');
     const clearJsonBtn = document.getElementById('clear-json');
@@ -63,6 +64,9 @@ document.addEventListener('DOMContentLoaded', () => {
                             display: true,
                             text: 'Time'
                         }
+                    },
+                    y: {
+                        beginAtZero: true
                     }
                 },
                 plugins: {
@@ -113,6 +117,9 @@ document.addEventListener('DOMContentLoaded', () => {
                             display: true,
                             text: 'Time'
                         }
+                    },
+                    y: {
+                        beginAtZero: true
                     }
                 },
                 plugins: {
@@ -174,6 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
         startBtn.disabled = false;
         stopBtn.disabled = true;
         stopLogPolling(); // Stop polling logs
+        if (chartWarning) chartWarning.style.display = 'none';
     });
 
     socket.on('connect', () => {
@@ -194,9 +202,18 @@ document.addEventListener('DOMContentLoaded', () => {
         startBtn.disabled = false;
         stopBtn.disabled = true;
         stopLogPolling(); // Stop polling logs on error
+        if (chartWarning) chartWarning.style.display = 'none';
     });
 
     const updateUI = (data) => {
+        if (chartWarning) {
+            if (data.total_rps === 0 || data.total_avg_response_time === 0) {
+                chartWarning.style.display = 'block';
+            } else {
+                chartWarning.style.display = 'none';
+            }
+        }
+
         const statsHTML = `
             <div class="stat-card"><h3>Users</h3><p>${data.user_count}</p></div>
             <div class="stat-card"><h3>RPS</h3><p>${parseFloat(data.total_rps).toFixed(2)}</p></div>
