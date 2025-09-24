@@ -5,4 +5,10 @@ class DefaultUser(HttpUser):
 
     @task
     def index_page(self):
-        self.client.get("/")
+        response = self.client.get("/")
+        
+        # Explicitly mark failures for Locust statistics
+        if response.status_code >= 400:
+            response.failure(f"HTTP {response.status_code}: {response.text[:100]}")
+        
+        print(f"DefaultUser - {response.status_code} - {response.url}")

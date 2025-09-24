@@ -438,4 +438,4 @@ if __name__ == "__main__":
     print("🚀 Starting Load Test Server...")
     print("📊 Access the dashboard at: http://localhost:8080")
     print("📚 API Documentation at: http://localhost:8080/docs")
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+    uvicorn.run(app, host="0.0.0.0", port=80)

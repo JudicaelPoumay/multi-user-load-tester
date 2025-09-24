@@ -86,12 +86,16 @@ class CustomUser(HttpUser):
             # Log response details
             print(f"{{self.__class__.__name__}} - {{response.status_code}} - {{response.url}}")
             
-            # You can add custom response validation here
+            # Explicitly mark failures for Locust statistics
             if response.status_code >= 400:
-                print(f"Error response: {{response.text[:200]}}")
+                response.failure(f"HTTP {{response.status_code}}: {{response.text[:100]}}")
+                print(f"FAILURE - {{response.status_code}}: {{response.text[:200]}}")
+            else:
+                print(f"SUCCESS - {{response.status_code}}")
                 
         except Exception as e:
             print(f"Request failed: {{str(e)}}")
+            # This will automatically be marked as a failure by Locust
 '''
     
     return locustfile_content
