@@ -37,7 +37,8 @@ class LocustFileFactory:
         route: str, 
         wait_time: float, 
         json_payload: Dict[Any, Any] = None, 
-        log_file_path: str = None
+        log_file_path: str = None,
+        bearer_token: str = None
     ) -> str:
         """
         Generate a complete Locust test file based on user parameters.
@@ -55,6 +56,7 @@ class LocustFileFactory:
             wait_time (float): Base wait time between requests in seconds
             json_payload (Dict[Any, Any], optional): JSON data for POST/PUT requests
             log_file_path (str, optional): Path for session-specific request logging
+            bearer_token (str, optional): Bearer token for authorization headers
             
         Returns:
             str: Complete Locust test file content as executable Python code
@@ -70,6 +72,11 @@ class LocustFileFactory:
             >>> print(config)  # Outputs complete Locust test file
         """
         
+        # Step 0: Handle Authorization Header
+        auth_header_code = ""
+        if bearer_token:
+            auth_header_code = f'self.client.headers["Authorization"] = f"Bearer {bearer_token}"'
+
         # Step 1: Generate HTTP request code based on the specified method
         if http_method == 'GET':
             # Simple GET request without payload
@@ -111,6 +118,10 @@ class CustomUser(HttpUser):
     # Configure wait time between requests (adds +1 second variance)
     wait_time = between({wait_time}, {wait_time + 1})
     
+    def on_start(self):
+        """Called when a user starts a test"""
+        {auth_header_code}
+
     @task
     def custom_task(self):
         """Custom task generated from user input"""

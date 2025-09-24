@@ -229,6 +229,9 @@ async def start_load_test(sid, data):
                     await sio.emit('error', {'message': 'Invalid JSON payload.'}, to=sid)
                     return
 
+            # Get bearer token if provided
+            bearer_token = data.get('bearer_token', '').strip()
+
             # Create a temporary log file for session-specific request logging
             import tempfile
             fd_log, log_file_path = tempfile.mkstemp(
@@ -239,7 +242,7 @@ async def start_load_test(sid, data):
             
             # Generate custom locustfile using the factory pattern
             locustfile_content = runner.create_custom_test(
-                http_method, route, wait_time, parsed_json, log_file_path
+                http_method, route, wait_time, parsed_json, log_file_path, bearer_token
             )
             
             # Start the Locust subprocess with the custom configuration

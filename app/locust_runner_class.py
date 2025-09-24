@@ -67,7 +67,7 @@ class LocustRunner:
         self._factory = LocustFileFactory()
 
     def create_custom_test(self, http_method: str, route: str, wait_time: float, 
-                          json_payload: Dict[Any, Any] = None, log_file_path: str = None) -> str:
+                          json_payload: Dict[Any, Any] = None, log_file_path: str = None, bearer_token: str = None) -> str:
         """
         Create a custom test configuration using the factory pattern.
         
@@ -80,11 +80,12 @@ class LocustRunner:
             wait_time (float): Wait time between requests in seconds
             json_payload (Dict[Any, Any], optional): JSON payload for POST/PUT requests
             log_file_path (str, optional): Path to session-specific log file
+            bearer_token (str, optional): Bearer token for authorization
             
         Returns:
             str: Complete Locust test file content as a string
         """
-        return self._factory.create_test_config(http_method, route, wait_time, json_payload, log_file_path)
+        return self._factory.create_test_config(http_method, route, wait_time, json_payload, log_file_path, bearer_token)
 
     async def start(self, host: str, num_users: int, spawn_rate: int, custom_locustfile: str = None) -> None:
         """
