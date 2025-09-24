@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Locust Web UI</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.4.1/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@2.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@1.2.1/dist/chartjs-plugin-zoom.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Locust Web UI</h1>
+        <div class="form-container">
+            <form id="locust-form">
+                <div class="form-group">
+                    <label for="host">Target Host</label>
+                    <input type="text" id="host" name="host" required placeholder="https://example.com">
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="num_users">Number of Users</label>
+                        <input type="number" id="num_users" name="num_users" required min="1" value="10">
+                    </div>
+                    <div class="form-group">
+                        <label for="spawn_rate">Spawn Rate</label>
+                        <input type="number" id="spawn_rate" name="spawn_rate" required min="1" value="1">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="http_method">HTTP Method</label>
+                    <select id="http_method" name="http_method" required>
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                        <option value="PUT">PUT</option>
+                        <option value="DELETE">DELETE</option>
+                        <option value="PATCH">PATCH</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="route">Route/Endpoint</label>
+                    <input type="text" id="route" name="route" placeholder="/api/endpoint" value="/">
+                </div>
+
+                <div class="form-group">
+                    <label for="wait_time">Wait Time Between Requests (seconds)</label>
+                    <input type="number" id="wait_time" name="wait_time" min="0" step="0.1" value="1" placeholder="1.0">
+                </div>
+
+                <div class="form-group">
+                    <label for="json_payload">JSON Payload (optional)</label>
+                    <div class="json-input-container">
+                        <textarea id="json_payload" name="json_payload" rows="6" placeholder='{"key": "value"}'></textarea>
+                        <div class="file-upload-section">
+                            <label for="json_file" class="file-upload-label">
+                                📁 Upload JSON File
+                                <input type="file" id="json_file" accept=".json" style="display: none;">
+                            </label>
+                            <button type="button" id="clear-json" class="clear-btn">Clear</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="buttons">
+                    <button type="submit" id="start-btn">Start Load Test</button>
+                    <button type="button" id="stop-btn" disabled>Stop Load Test</button>
+                </div>
+            </form>
+        </div>
+        <div class="stats-container">
+            <h2>Live Statistics</h2>
+            <div id="stats" class="stats-grid"></div>
+            <div class="charts">
+                <canvas id="rpsChart"></canvas>
+                <canvas id="responseTimeChart"></canvas>
+            </div>
+        </div>
+        <div id="error-container" class="error-message"></div>
+    </div>
+    <script src="/static/script.js"></script>
+</body>
+</html>

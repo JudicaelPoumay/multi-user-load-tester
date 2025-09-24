@@ -1,0 +1,7 @@
+fastapi
+locust
+uvicorn
+python-socketio
+aiofiles
+jinja2
+aiohttp
