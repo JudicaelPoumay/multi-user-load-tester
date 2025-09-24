@@ -204,7 +204,7 @@ async def slow_endpoint():
     request_count += 1
     
     # Random delay between 1-3 seconds
-    delay = random.uniform(1.0, 3.0)
+    delay = random.uniform(10.0, 30.0)
     await asyncio.sleep(delay)
     
     return JSONResponse(

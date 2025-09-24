@@ -18,6 +18,22 @@ document.addEventListener('DOMContentLoaded', () => {
         avgResponseTime: [],
     };
 
+    const resetChartData = () => {
+        chartData.labels = [];
+        chartData.rps = [];
+        chartData.avgResponseTime = [];
+        if (rpsChart) {
+            rpsChart.data.labels = chartData.labels;
+            rpsChart.data.datasets[0].data = chartData.rps;
+            rpsChart.update();
+        }
+        if (responseTimeChart) {
+            responseTimeChart.data.labels = chartData.labels;
+            responseTimeChart.data.datasets[0].data = chartData.avgResponseTime;
+            responseTimeChart.update();
+        }
+    };
+
     const initCharts = () => {
         const rpsCtx = document.getElementById('rpsChart').getContext('2d');
         rpsChart = new Chart(rpsCtx, {
@@ -52,15 +68,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 plugins: {
                     zoom: {
                         pan: {
-                            enabled: true,
+                            enabled: false,
                             mode: 'x'
                         },
                         zoom: {
                             wheel: {
-                                enabled: true,
+                                enabled: false,
                             },
                             pinch: {
-                                enabled: true
+                                enabled: false
                             },
                             mode: 'x',
                         }
@@ -102,15 +118,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 plugins: {
                     zoom: {
                         pan: {
-                            enabled: true,
+                            enabled: false,
                             mode: 'x'
                         },
                         zoom: {
                             wheel: {
-                                enabled: true,
+                                enabled: false,
                             },
                             pinch: {
-                                enabled: true
+                                enabled: false
                             },
                             mode: 'x',
                         }
@@ -141,6 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const formData = new FormData(form);
         const data = Object.fromEntries(formData.entries());
         
+        resetChartData(); // Reset charts
         socket.emit('start_load_test', data);
         startBtn.disabled = true;
         stopBtn.disabled = false;
