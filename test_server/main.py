@@ -190,7 +190,7 @@ async def json_endpoint(payload: JsonPayload):
             "status": "success",
             "message": "JSON payload processed successfully",
             "received_data": {
-                "data": payload,
+                "data": payload.dict(),
                 "processed_at": time.time()
             },
             "request_id": request_count
