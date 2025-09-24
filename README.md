@@ -40,14 +40,15 @@ A modern, web-based load testing platform built with FastAPI and Locust that all
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/multi-user-load-tester.git
+git clone https://github.com/JudicaelPoumay/multi-user-load-tester.git
 cd multi-user-load-tester
 
-# Run with Docker Compose
+# Run with Docker Compose (includes test server)
 docker-compose up --build
 
-# Access the application
-open http://localhost:8000
+# Access the applications
+open http://localhost:8000  # Load Tester Dashboard
+open http://localhost:8080  # Test Server Dashboard
 ```
 
 ### Local Development
@@ -60,9 +61,44 @@ cd multi-user-load-tester
 # Install dependencies
 pip install -r requirements.txt
 
-# Run the application
+# Run the load tester
 python -m app.main
+
+# In another terminal, run the test server
+cd test_server
+pip install -r requirements.txt
+python main.py
 ```
+
+## 🧪 Test Server
+
+The project includes a comprehensive test server to demonstrate and validate all load testing features.
+
+### Available Test Endpoints
+
+| Endpoint | Method | Purpose | Expected Result |
+|----------|--------|---------|-----------------|
+| `/success` | GET | Always succeeds | 100% success rate |
+| `/fail` | GET | Always fails | 100% failure rate (HTTP 500) |
+| `/json` | POST | Requires JSON payload | Tests JSON handling |
+| `/slow` | GET | 1-3 second delays | Tests response time monitoring |
+| `/random` | GET | 70% success rate | Realistic mixed results |
+| `/users` | POST | Create users | Complex JSON validation |
+| `/users/{id}` | GET | Get user by ID | Parameterized routes |
+| `/users/{id}` | DELETE | Delete user | DELETE method testing |
+
+### Quick Test Examples
+
+```bash
+# Test the included server
+curl http://localhost:8080/success  # ✅ Always succeeds
+curl http://localhost:8080/fail     # ❌ Always fails
+curl -X POST http://localhost:8080/json \
+  -H "Content-Type: application/json" \
+  -d '{"message": "test", "data": {"key": "value"}}'
+```
+
+For comprehensive test scenarios, see [examples/test-configurations.md](examples/test-configurations.md).
 
 ## 🎯 Usage Guide
 
@@ -192,6 +228,12 @@ multi-user-load-tester/
 │   │   └── styles.css       # UI Styling
 │   └── templates/
 │       └── index.html       # Main dashboard
+├── test_server/
+│   ├── main.py              # Test server with various endpoints
+│   ├── requirements.txt     # Test server dependencies
+│   └── Dockerfile          # Test server container
+├── examples/
+│   └── test-configurations.md  # Comprehensive test scenarios
 ├── locustfile.py           # Default Locust test
 ├── requirements.txt        # Python dependencies
 ├── Dockerfile             # Container configuration
