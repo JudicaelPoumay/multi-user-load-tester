@@ -146,7 +146,9 @@ document.addEventListener('DOMContentLoaded', () => {
         stopBtn.disabled = false;
         errorContainer.style.display = 'none';
         document.getElementById('error-report-container').innerHTML = ''; // Clear previous errors
-        if (logContainer) logContainer.innerHTML = ''; // Clear previous logs
+        // Clear previous logs but keep the structure
+        const logContent = logContainer?.querySelector('.log-content');
+        if (logContent) logContent.innerHTML = '';
         startLogPolling(); // Start polling logs
     });
 
@@ -237,18 +239,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const displayLogs = (logs) => {
         if (!logContainer) return;
         
-        let logsHTML = '<h3>Request Log (Last 100 entries)</h3><div class="log-content">';
+        const logContent = logContainer.querySelector('.log-content');
+        if (!logContent) return;
+        
+        // Clear existing logs and add new ones
+        let logsHTML = '';
         logs.forEach(log => {
             logsHTML += `<div class="log-line">${log}</div>`;
         });
-        logsHTML += '</div>';
-        logContainer.innerHTML = logsHTML;
+        logContent.innerHTML = logsHTML;
         
         // Auto-scroll to bottom
-        const logContent = logContainer.querySelector('.log-content');
-        if (logContent) {
-            logContent.scrollTop = logContent.scrollHeight;
-        }
+        logContent.scrollTop = logContent.scrollHeight;
     };
 
     // JSON file upload handling

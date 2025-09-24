@@ -1,17 +1,20 @@
+"""Locust runner class for managing Locust subprocess instances"""
+
 import asyncio
-import json
 import logging
 import sys
 import tempfile
 import os
-import time
 import aiohttp
 from asyncio.subprocess import Process
-from typing import Optional
+from typing import Optional, Dict, Any
+from locust_file_factory import LocustFileFactory
 
 logger = logging.getLogger(__name__)
 
 class LocustRunner:
+    """Manages a Locust subprocess instance for load testing"""
+    
     def __init__(self, port: int = 8089) -> None:
         self._process: Optional[Process] = None
         self._stats_queue: Optional[asyncio.Queue] = None
@@ -19,10 +22,16 @@ class LocustRunner:
         self._stderr_task: Optional[asyncio.Task] = None
         self._locust_port = port
         self._temp_locustfile: Optional[str] = None
+        self._factory = LocustFileFactory()
+
+    def create_custom_test(self, http_method: str, route: str, wait_time: float, 
+                          json_payload: Dict[Any, Any] = None, log_file_path: str = None) -> str:
+        """Create a custom test configuration using the factory"""
+        return self._factory.create_test_config(http_method, route, wait_time, json_payload, log_file_path)
 
     async def start(self, host: str, num_users: int, spawn_rate: int, custom_locustfile: str = None) -> None:
+        """Start the Locust subprocess with the given parameters"""
         await self.stop()
-        
         
         # Use custom locustfile if provided, otherwise use default
         locustfile_path = "locustfile.py"
@@ -79,6 +88,7 @@ class LocustRunner:
         self._polling_task = asyncio.create_task(self._poll_stats())
 
     async def stop(self) -> None:
+        """Stop the Locust subprocess and clean up resources"""
         if self._polling_task:
             self._polling_task.cancel()
         if self._stderr_task:
@@ -118,10 +128,9 @@ class LocustRunner:
                 logger.warning(f"Failed to clean up temporary locustfile: {e}")
             finally:
                 self._temp_locustfile = None
-                
-
 
     async def stats(self):
+        """Generator that yields statistics from the Locust instance"""
         if not self._stats_queue:
             return
         while True:
@@ -163,6 +172,7 @@ class LocustRunner:
                 await asyncio.sleep(1)
 
     async def _consume_stderr(self) -> None:
+        """Consume stderr from the Locust subprocess"""
         assert self._process and self._process.stderr
         try:
             while True:

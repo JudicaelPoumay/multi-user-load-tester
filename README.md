@@ -27,6 +27,10 @@ A modern, web-based load testing platform built with FastAPI and Locust that all
 - Interactive charts for RPS and response times
 - Pan and zoom functionality for detailed analysis
 - Color-coded status indicators
+- **Persistent Request Log**: Pre-loaded log section visible before tests start
+- **Server-side logging**: Real-time test server logs with request tracking
+- **Enhanced error reporting**: Improved error rate display and detailed failure analysis
+- **Modular Frontend**: Clean separation of concerns with improved maintainability
 
 ### 🐳 **Production Ready**
 - Docker containerization with security best practices
@@ -78,6 +82,7 @@ The project includes a comprehensive test server to demonstrate and validate all
 
 | Endpoint | Method | Purpose | Expected Result |
 |----------|--------|---------|-----------------|
+| `/` | GET | Server dashboard | HTML status page with real-time stats |
 | `/success` | GET | Always succeeds | 100% success rate |
 | `/fail` | GET | Always fails | 100% failure rate (HTTP 500) |
 | `/json` | POST | Requires JSON payload | Tests JSON handling |
@@ -86,6 +91,7 @@ The project includes a comprehensive test server to demonstrate and validate all
 | `/users` | POST | Create users | Complex JSON validation |
 | `/users/{id}` | GET | Get user by ID | Parameterized routes |
 | `/users/{id}` | DELETE | Delete user | DELETE method testing |
+| `/stats` | GET | Server statistics | JSON stats with request/failure counts |
 
 ### Quick Test Examples
 
@@ -97,6 +103,12 @@ curl -X POST http://localhost:8080/json \
   -H "Content-Type: application/json" \
   -d '{"message": "test", "data": {"key": "value"}}'
 ```
+
+### Server Monitoring & Logs
+- **Real-time Dashboard**: Visit `http://localhost:8080` for live server status
+- **Statistics API**: Access `http://localhost:8080/stats` for JSON metrics
+- **Request Logging**: Server logs all requests with timestamps and response codes
+- **Load Test Integration**: Automatic request/response tracking during load tests
 
 For comprehensive test scenarios, see [examples/test-configurations.md](examples/test-configurations.md).
 
@@ -156,11 +168,12 @@ For comprehensive test scenarios, see [examples/test-configurations.md](examples
 
 ### Key Components
 
-- **FastAPI Backend**: Handles WebSocket connections and API endpoints
-- **Port Manager**: Allocates unique ports for each user session
-- **Locust Runner**: Manages individual Locust subprocesses
-- **Dynamic Locustfile Generator**: Creates custom test scripts on-the-fly
-- **Real-time Dashboard**: Live monitoring with charts and statistics
+- **FastAPI Backend** (`main.py`): Handles WebSocket connections and API endpoints
+- **Port Manager** (`port_manager.py`): Allocates unique ports for each user session
+- **Locust Runner** (`locust_runner_class.py`): Manages individual Locust subprocesses
+- **Locust File Factory** (`locust_file_factory.py`): Creates custom test scripts on-the-fly
+- **Real-time Dashboard** (`index.html`): Live monitoring with charts, statistics, and persistent log sections
+- **Modular Architecture**: Each class is separated into its own file for better maintainability
 
 ## 🔧 Configuration
 
@@ -221,25 +234,39 @@ CPU_LIMIT=2.0
 ```
 multi-user-load-tester/
 ├── app/
-│   ├── main.py              # FastAPI application
-│   ├── locust_runner.py     # Locust subprocess management
+│   ├── main.py                   # FastAPI application & WebSocket handlers
+│   ├── locust_runner_class.py    # LocustRunner class (subprocess management)
+│   ├── locust_file_factory.py    # Factory for generating custom test configs
+│   ├── port_manager.py           # Port allocation management
 │   ├── static/
-│   │   ├── script.js        # Frontend JavaScript
-│   │   └── styles.css       # UI Styling
+│   │   ├── script.js             # Frontend JavaScript with real-time updates
+│   │   └── styles.css            # UI Styling with log container styles
 │   └── templates/
-│       └── index.html       # Main dashboard
+│       └── index.html            # Main dashboard with pre-built log sections
 ├── test_server/
-│   ├── main.py              # Test server with various endpoints
-│   ├── requirements.txt     # Test server dependencies
-│   └── Dockerfile          # Test server container
-├── examples/
-│   └── test-configurations.md  # Comprehensive test scenarios
-├── locustfile.py           # Default Locust test
-├── requirements.txt        # Python dependencies
-├── Dockerfile             # Container configuration
-├── docker-compose.yml     # Multi-container setup
-└── README.md              # This file
+│   ├── main.py                   # Test server with various endpoints
+│   ├── requirements.txt          # Test server dependencies
+│   └── Dockerfile               # Test server container
+├── locustfile.py                # Simple default Locust test configuration
+├── requirements.txt             # Python dependencies
+├── Dockerfile                   # Container configuration
+├── docker-compose.yml          # Multi-container setup
+└── README.md                    # This file
 ```
+
+### Recent Architecture Improvements
+
+#### **Modular Class Structure** *(September 2025)*
+- **Separated Components**: Each class now resides in its own dedicated file
+- **Better Maintainability**: Easier to locate, modify, and test individual components
+- **Clean Dependencies**: Clear import structure and reduced coupling
+- **Single Responsibility**: Each file has a focused, specific purpose
+
+#### **Enhanced Frontend** *(September 2025)*  
+- **Persistent UI Elements**: Request log section is always visible
+- **Improved UX**: Users can see where logs will appear before starting tests
+- **Better Structure**: Clean separation between HTML structure and dynamic content
+- **Consistent Layout**: Maintained functionality while improving organization
 
 ### Contributing
 
@@ -299,17 +326,29 @@ docker-compose up --scale app=1 --memory 4g
 - Use the file upload feature for complex JSON
 - Check browser console for detailed error messages
 
+**Error Rate Display Issues** *(Recently Fixed)*
+- Error rates now display correctly with improved calculation
+- Failed requests are properly tracked and reported
+- Real-time error statistics are more accurate
+
 ### Logs and Debugging
 
 ```bash
 # View application logs
 docker-compose logs -f
 
+# View test server logs specifically
+docker-compose logs -f test-server
+
 # Access container shell
 docker-compose exec app bash
 
 # Check locust processes
 ps aux | grep locust
+
+# Monitor test server real-time (NEW)
+curl http://localhost:8080/stats | jq
+curl http://localhost:8080  # HTML dashboard
 ```
 
 ## 📜 License
@@ -326,5 +365,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Happy Load Testing!** 🎯
+
+*Last Updated: September 2025 - Recent improvements include modular architecture refactoring, persistent request log UI, enhanced logging, and better error tracking*
 
 For questions, issues, or contributions, please visit our [GitHub repository](https://github.com/yourusername/multi-user-load-tester).

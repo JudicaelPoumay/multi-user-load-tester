@@ -6,7 +6,8 @@ import socketio
 import asyncio
 import json
 import os
-from locust_runner import LocustRunner
+from locust_runner_class import LocustRunner
+from port_manager import PortManager
 import logging
 
 app = FastAPI()
@@ -26,92 +27,8 @@ socket_app = socketio.ASGIApp(sio, app)
 # Dictionary to hold locust runners for each session
 runners = {}
 
-# Port management for unique Locust instances
-class PortManager:
-    def __init__(self, start_port: int = 8090):
-        self._start_port = start_port
-        self._used_ports = set()
-        self._session_ports = {}
-    
-    def allocate_port(self, session_id: str) -> int:
-        if session_id in self._session_ports:
-            return self._session_ports[session_id]
-        
-        port = self._start_port
-        while port in self._used_ports:
-            port += 1
-        
-        self._used_ports.add(port)
-        self._session_ports[session_id] = port
-        return port
-    
-    def release_port(self, session_id: str) -> None:
-        if session_id in self._session_ports:
-            port = self._session_ports[session_id]
-            self._used_ports.discard(port)
-            del self._session_ports[session_id]
-
 port_manager = PortManager()
 
-def generate_custom_locustfile(http_method: str, route: str, wait_time: float, json_payload: dict = None, log_file_path: str = None) -> str:
-    """Generate a custom locustfile based on user parameters"""
-    
-    # Build the request code based on HTTP method
-    if http_method == 'GET':
-        request_code = f'response = self.client.get("{route}")'
-    elif http_method in ['POST', 'PUT', 'PATCH']:
-        if json_payload:
-            json_str = json.dumps(json_payload, indent=12)  # Extra indent for proper alignment
-            request_code = f'''json_data = {json_str}
-            response = self.client.{http_method.lower()}("{route}", json=json_data)'''
-        else:
-            request_code = f'response = self.client.{http_method.lower()}("{route}")'
-    elif http_method == 'DELETE':
-        request_code = f'response = self.client.delete("{route}")'
-    else:
-        request_code = f'response = self.client.get("{route}")  # Fallback to GET'
-
-    # Generate the complete locustfile
-    log_code = ""
-    if log_file_path:
-        log_code = f'''
-            # Log to temporary file
-            import datetime
-            with open(r"{log_file_path}", "a", encoding="utf-8") as log_file:
-                timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                log_file.write(f"{{timestamp}} - {{response.status_code}} - {{response.url}} - {{response.elapsed.total_seconds():.3f}}s\\n")
-                log_file.flush()'''
-    
-    locustfile_content = f'''from locust import HttpUser, task, between
-import json
-import datetime
-
-class CustomUser(HttpUser):
-    wait_time = between({wait_time}, {wait_time + 1})
-    
-    @task
-    def custom_task(self):
-        """Custom task generated from user input"""
-        try:
-            {request_code}
-            {log_code}
-            
-            # Log response details
-            print(f"{{self.__class__.__name__}} - {{response.status_code}} - {{response.url}}")
-            
-            # Explicitly mark failures for Locust statistics
-            if response.status_code >= 400:
-                response.failure(f"HTTP {{response.status_code}}: {{response.text[:100]}}")
-                print(f"FAILURE - {{response.status_code}}: {{response.text[:200]}}")
-            else:
-                print(f"SUCCESS - {{response.status_code}}")
-                
-        except Exception as e:
-            print(f"Request failed: {{str(e)}}")
-            # This will automatically be marked as a failure by Locust
-'''
-    
-    return locustfile_content
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
@@ -210,8 +127,8 @@ async def start_load_test(sid, data):
             fd_log, log_file_path = tempfile.mkstemp(suffix='.log', prefix=f'port_{runners[sid]._locust_port}_')
             os.close(fd_log)
             
-            # Generate custom locustfile with logging
-            locustfile_content = generate_custom_locustfile(
+            # Generate custom locustfile with logging using the factory
+            locustfile_content = runner.create_custom_test(
                 http_method, route, wait_time, parsed_json, log_file_path
             )
             
