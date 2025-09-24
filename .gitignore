@@ -145,7 +145,6 @@ Desktop.ini
 # Temporary files
 *.tmp
 *.temp
-locust_*.py
 
 # Logs
 logs/
