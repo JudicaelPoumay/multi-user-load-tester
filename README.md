@@ -75,7 +75,7 @@ You can run the application using Docker (recommended) or locally.
 .
 ├── app/                  # Main application source code
 │   ├── main.py           # FastAPI application, WebSocket handling
-│   ├── locust_runner_class.py # Manages Locust subprocesses
+│   ├── locust_runner.py # Manages Locust subprocesses
 │   ├── locust_file_factory.py # Dynamically generates locustfiles
 │   ├── port_manager.py   # Manages ports for Locust instances
 │   ├── static/           # CSS and JavaScript files

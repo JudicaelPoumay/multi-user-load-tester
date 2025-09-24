@@ -23,7 +23,7 @@ import socketio
 import asyncio
 import json
 import os
-from locust_runner_class import LocustRunner
+from locust_runner import LocustRunner
 from port_manager import PortManager
 import logging
 
