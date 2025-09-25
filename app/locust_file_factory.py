@@ -72,80 +72,23 @@ class LocustFileFactory:
             >>> print(config)  # Outputs complete Locust test file
         """
         
-        # Step 0: Handle Authorization Header
-        auth_header_code = ""
-        if bearer_token:
-            auth_header_code = f'self.client.headers["Authorization"] = f"Bearer {bearer_token}"'
+        # Step 1: Read the template file
+        with open("app/locustfile_sample.py", "r", encoding="utf-8") as f:
+            template = f.read()
 
-        # Step 1: Generate HTTP request code based on the specified method
-        if http_method == 'GET':
-            # Simple GET request without payload
-            request_code = f'response = self.client.get("{route}")'
-        elif http_method in ['POST', 'PUT', 'PATCH']:
-            # Methods that typically include request bodies
-            if json_payload:
-                # Format JSON with proper indentation for readable generated code
-                json_str = json.dumps(json_payload, indent=12)  # 12 spaces for alignment
-                request_code = f'''json_data = {json_str}
-            response = self.client.{http_method.lower()}("{route}", json=json_data)'''
-            else:
-                # No payload provided for POST/PUT/PATCH request
-                request_code = f'response = self.client.{http_method.lower()}("{route}")'
-        elif http_method == 'DELETE':
-            # DELETE requests typically don't have payloads
-            request_code = f'response = self.client.delete("{route}")'
-        else:
-            # Fallback for unsupported methods - default to GET
-            request_code = f'response = self.client.get("{route}")  # Fallback to GET'
+        # Step 2: Prepare variable replacements
+        replacements = {
+            "{HTTP_METHOD}": http_method,
+            "{ROUTE}": route,
+            "{JSON_PAYLOAD}": json.dumps(json_payload) if json_payload else "None",
+            "{BEARER_TOKEN}": f'"{bearer_token}"' if bearer_token else "None",
+            "{LOG_FILE_PATH}": f'r"{log_file_path}"' if log_file_path else "None",
+            "{WAIT_TIME_MIN}": str(wait_time),
+            "{WAIT_TIME_MAX}": str(wait_time + 1),
+        }
 
-        # Step 2: Generate optional logging code for session-specific request tracking
-        log_code = ""
-        if log_file_path:
-            log_code = f'''
-            # Log request details to session-specific file
-            import datetime
-            with open(r"{log_file_path}", "a", encoding="utf-8") as log_file:
-                timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                log_file.write(f"{{timestamp}} - {{response.status_code}} - {{response.url}} - {{response.elapsed.total_seconds():.3f}}s\\n")
-                log_file.flush()'''
+        # Step 3: Replace placeholders in the template
+        for placeholder, value in replacements.items():
+            template = template.replace(placeholder, value)
         
-        # Step 3: Generate the complete Locust test file template
-        locustfile_content = f'''from locust import HttpUser, task, between
-import json
-import datetime
-
-class CustomUser(HttpUser):
-    # Configure wait time between requests (adds +1 second variance)
-    wait_time = between({wait_time}, {wait_time + 1})
-    
-    def on_start(self):
-        """Called when a user starts a test"""
-        {auth_header_code}
-
-    @task
-    def custom_task(self):
-        """Custom task generated from user input"""
-        try:
-            # Execute the generated HTTP request
-            {request_code}
-            {log_code}
-            
-            # Log response details to console for real-time monitoring
-            print(f"{{self.__class__.__name__}} - {{response.status_code}} - {{response.url}}")
-            
-            # Explicitly mark failures for Locust statistics tracking
-            if response.status_code >= 400:
-                # Mark as failure and log detailed error information
-                response.failure(f"HTTP {{response.status_code}}: {{response.text[:100]}}")
-                print(f"FAILURE - {{response.status_code}}: {{response.text[:200]}}")
-            else:
-                # Log successful requests
-                print(f"SUCCESS - {{response.status_code}}")
-                
-        except Exception as e:
-            # Handle request exceptions (network errors, timeouts, etc.)
-            print(f"Request failed: {{str(e)}}")
-            # This will automatically be marked as a failure by Locust
-'''
-        
-        return locustfile_content
+        return template
