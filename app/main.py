@@ -15,7 +15,7 @@ Key Features:
 Author: JudicaelPoumay
 """
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -59,6 +59,15 @@ timeout_tasks = {}
 port_manager = PortManager()
 
 
+def check_user_groups() -> bool:
+    """
+    Placeholder for SSO user group check.
+    This function should be implemented to check if the user belongs to the required groups.
+    """
+    # TODO: Implement actual SSO group check logic here.
+    return True
+
+
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     """
@@ -73,6 +82,8 @@ async def read_root(request: Request):
     Returns:
         HTMLResponse: Rendered HTML template
     """
+    if not check_user_groups():
+        return templates.TemplateResponse("403.html", {"request": request}, status_code=403)
     return templates.TemplateResponse("index.html", {"request": request})
 
 @app.get("/logs/{session_id}")
