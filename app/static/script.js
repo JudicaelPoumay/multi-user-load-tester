@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const stopBtn = document.getElementById('stop-btn');
     const statsDiv = document.getElementById('stats');
     const errorContainer = document.getElementById('error-container');
+    const stopWarningContainer = document.getElementById('stop-warning-container');
     const chartWarning = document.getElementById('chart-warning');
     const jsonFileInput = document.getElementById('json_file');
     const jsonPayloadTextarea = document.getElementById('json_payload');
@@ -13,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let rpsChart, responseTimeChart;
     let logPollingInterval = null;
+    let shouldPollLogs = false; // Flag to indicate if polling should start
     const chartData = {
         labels: [],
         rps: [],
@@ -169,6 +171,7 @@ document.addEventListener('DOMContentLoaded', () => {
         startBtn.disabled = true;
         stopBtn.disabled = false;
         errorContainer.style.display = 'none';
+        stopWarningContainer.style.display = 'none';
         document.getElementById('error-report-container').innerHTML = ''; // Clear previous errors
         // Clear previous logs but keep the structure
         const logContent = logContainer?.querySelector('.log-content');
@@ -185,7 +188,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     socket.on('connect', () => {
-        console.log('Connected to server');
+        console.log('Connected to server with ID:', socket.id);
+        if (shouldPollLogs) {
+            startLogPolling();
+        }
     });
 
     socket.on('disconnect', () => {
@@ -203,6 +209,14 @@ document.addEventListener('DOMContentLoaded', () => {
         stopBtn.disabled = true;
         stopLogPolling(); // Stop polling logs on error
         if (chartWarning) chartWarning.style.display = 'none';
+    });
+
+    socket.on('test_stopped', (data) => {
+        stopWarningContainer.textContent = data.message;
+        stopWarningContainer.style.display = 'block';
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+        stopLogPolling();
     });
 
     const updateUI = (data) => {
@@ -245,8 +259,21 @@ document.addEventListener('DOMContentLoaded', () => {
             clearInterval(logPollingInterval);
         }
         
+        if (!socket.id) {
+            console.log('Socket not connected yet, waiting for connection...');
+            shouldPollLogs = true;
+            return;
+        }
+
+        shouldPollLogs = false; // Reset flag
+
         const pollLogs = async () => {
             try {
+                if (!socket.id) {
+                    console.error('Socket ID is not available, stopping polling.');
+                    stopLogPolling();
+                    return;
+                }
                 const response = await fetch(`/logs/${socket.id}`);
                 const data = await response.json();
                 
@@ -268,6 +295,7 @@ document.addEventListener('DOMContentLoaded', () => {
             clearInterval(logPollingInterval);
             logPollingInterval = null;
         }
+        shouldPollLogs = false; // Also reset flag when stopping
     };
 
     const displayLogs = (logs) => {
@@ -327,4 +355,36 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     initCharts();
+    
+    // Peak Usage Estimator
+    const calculateBtn = document.getElementById('calculate-btn');
+    const estimatorResultDiv = document.getElementById('estimator-result');
+
+    calculateBtn.addEventListener('click', () => {
+        const dau = parseInt(document.getElementById('dau').value);
+        const sessionLength = parseInt(document.getElementById('session-length').value);
+        const activeHours = parseInt(document.getElementById('active-hours').value);
+        const peakFactor = parseInt(document.getElementById('peak-factor').value);
+
+        if (dau > 0 && sessionLength > 0 && activeHours > 0 && peakFactor > 0) {
+            const activeHoursMin = activeHours * 60;
+            const ccuAvg = (dau * sessionLength) / activeHoursMin;
+            let ccuPeak = ccuAvg * peakFactor;
+
+            // Cap the peak usage to the number of daily active users
+            if (ccuPeak > dau) {
+                ccuPeak = dau;
+            }
+
+            estimatorResultDiv.innerHTML = `
+                <h3>Estimated Peak Concurrent Users:</h3>
+                <p>${Math.ceil(ccuPeak)}</p>
+            `;
+        } else {
+            estimatorResultDiv.innerHTML = `
+                <h3>Error:</h3>
+                <p>Please enter valid values for all fields.</p>
+            `;
+        }
+    });
 });

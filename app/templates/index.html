@@ -77,6 +77,45 @@
                 </div>
             </form>
         </div>
+        <div class="estimator-container">
+            <h2>Peak Usage Estimator</h2>
+            <form id="estimator-form">
+                <div class="form-group">
+                    <label for="dau">Number of Daily Active Users (DAU)</label>
+                    <input type="number" id="dau" name="dau" required min="1" value="3000">
+                </div>
+                <div class="form-group">
+                    <label for="session-length">Daily Average Session Length</label>
+                    <select id="session-length" name="session-length" required>
+                        <option value="5">5 minutes (e.g., bank app)</option>
+                        <option value="20">20 minutes (e.g., ChatGPT)</option>
+                        <option value="40">40 minutes (e.g., social media)</option>
+                        <option value="120">120 minutes (e.g., Teams)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="active-hours">Userbase Active Hours</label>
+                    <select id="active-hours" name="active-hours" required>
+                        <option value="8">8 hours (during work hours)</option>
+                        <option value="24">24 hours (all day)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="peak-factor">Peak Factor</label>
+                    <select id="peak-factor" name="peak-factor" required>
+                        <option value="2">Soft Peak (2x)</option>
+                        <option value="4">Heavy Peak (4x)</option>
+                    </select>
+                </div>
+                <div class="buttons">
+                    <button type="button" id="calculate-btn">Calculate Peak Usage</button>
+                </div>
+            </form>
+            <div id="estimator-result" class="estimator-result"></div>
+        </div>
+        <div id="error-container" class="error-message"></div>
+        <div id="stop-warning-container" class="warning-message"></div>
+        <div id="error-report-container" class="error-report"></div>
         <div class="stats-container">
             <h2>Live Statistics</h2>
             <div id="stats" class="stats-grid"></div>
@@ -88,13 +127,14 @@
                 <canvas id="responseTimeChart"></canvas>
             </div>
         </div>
-        <div id="error-container" class="error-message"></div>
-        <div id="error-report-container" class="error-report"></div>
         <div id="log-container" class="log-container">
             <h3>Request Log (Last 100 entries)</h3>
             <div class="log-content"></div>
         </div>
     </div>
+    <footer>
+        <p>For security reason, any load testing cannot last longer than 10 minutes, Please contact the administrator for an increase in the timeout.</p>
+    </footer>
     <script src="/static/script.js"></script>
 </body>
 </html>

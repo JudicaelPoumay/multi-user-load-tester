@@ -51,6 +51,7 @@ socket_app = socketio.ASGIApp(sio, app)
 # Global session management
 # Dictionary to hold active locust runner instances for each user session
 runners = {}
+timeout_tasks = {}
 
 # Port manager instance to allocate unique ports for each Locust instance
 port_manager = PortManager()
@@ -148,6 +149,15 @@ async def connect(sid, environ):
     
     # Create a new isolated LocustRunner for this session
     runners[sid] = LocustRunner(port=port)
+    
+    async def timeout_task():
+        await asyncio.sleep(600)
+        logger.info(f"Timeout for session {sid}. Disconnecting client.")
+        await stop_load_test(sid)
+        await sio.disconnect(sid)
+
+    task = sio.start_background_task(timeout_task)
+    timeout_tasks[sid] = task
 
 @sio.event
 async def disconnect(sid):
@@ -161,6 +171,11 @@ async def disconnect(sid):
         sid (str): Socket.IO session identifier
     """
     logger.info(f"Client disconnected: {sid}")
+    
+    if sid in timeout_tasks:
+        timeout_tasks[sid].cancel()
+        del timeout_tasks[sid]
+        
     if sid in runners:
         runner = runners[sid]
         
@@ -270,9 +285,13 @@ async def stop_load_test(sid):
         sid (str): Socket.IO session identifier
     """
     logger.info(f"Stopping load test for {sid}")
+    await sio.emit('test_stopped', {'message': 'Timeout: Stopping load testing for safety reasons (max 10 minutes).  Please contact the administrator if you want to increase the timeout.'}, to=sid)
     runner = runners.get(sid)
     if runner:
-        await runner.stop()
+        try:
+            await runner.stop()
+        finally:
+            await sio.emit('test_stopped', {'message': 'Load testing has stopped for safety reasons (max 10 minutes).  Please contact the administrator if you want to increase the timeout.'}, to=sid)
 
 if __name__ == '__main__':
     """
