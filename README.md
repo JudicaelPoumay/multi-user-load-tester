@@ -9,6 +9,9 @@ A multi-user, web-based load testing application powered by FastAPI and Locust. 
 -   **Real-Time Statistics**: View real-time load testing metrics (RPS, average response time, failure rate) streamed via WebSockets.
 -   **Session-based Logging**: Access and review logs for each test session.
 -   **Containerized**: Comes with a `Dockerfile` for easy deployment.
+-   **10-Minute Timeout & Peak Usage Estimator**: Automatically stops tests after 10 minutes and provides a peak usage estimation.
+-   **AAD Token Generator & JWT Decoder**: Includes tools for generating Azure Active Directory tokens and decoding JWTs for testing authenticated endpoints.
+-   **SSO Placeholder**: A placeholder for Single Sign-On (SSO) integration is available.
 
 ## How to Run
 
