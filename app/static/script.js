@@ -404,6 +404,72 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // AAD Token Generator
+    const generateTokenBtn = document.getElementById('generate-token-btn');
+    const tokenResultContainer = document.getElementById('token-result-container');
+    const tokenResultPre = document.getElementById('token-result');
+
+    generateTokenBtn.addEventListener('click', async () => {
+        const applicationId = document.getElementById('application-id').value;
+        const applicationSecret = document.getElementById('application-secret').value;
+        const apiScope = document.getElementById('api-scope').value;
+
+        if (!applicationId || !applicationSecret || !apiScope) {
+            alert('Please fill in all fields.');
+            return;
+        }
+
+        try {
+            const response = await fetch('/generate_aad_token', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    application_id: applicationId,
+                    application_secret: applicationSecret,
+                    api_scope: apiScope,
+                }),
+            });
+
+            const result = await response.json();
+
+            if (result.access_token) {
+                tokenResultPre.textContent = result.access_token;
+                tokenResultContainer.style.display = 'block';
+            } else {
+                const errorMessage = result.details || 'An unknown error occurred.';
+                tokenResultPre.textContent = `Error: ${errorMessage}`;
+                tokenResultContainer.style.display = 'block';
+            }
+        } catch (error) {
+            tokenResultPre.textContent = `Error: ${error.message}`;
+            tokenResultContainer.style.display = 'block';
+        }
+    });
+
+    // JWT Decoder
+    const decodeJwtBtn = document.getElementById('decode-jwt-btn');
+    const jwtDecodedResultContainer = document.getElementById('jwt-decoded-result-container');
+    const jwtDecodedResultPre = document.getElementById('jwt-decoded-result');
+
+    decodeJwtBtn.addEventListener('click', () => {
+        const token = document.getElementById('jwt-token').value;
+        if (!token) {
+            alert('Please paste a JWT token.');
+            return;
+        }
+
+        try {
+            const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+            jwtDecodedResultPre.textContent = JSON.stringify(payload, null, 2);
+            jwtDecodedResultContainer.style.display = 'block';
+        } catch (e) {
+            jwtDecodedResultPre.textContent = `Error decoding JWT: ${e.message}`;
+            jwtDecodedResultContainer.style.display = 'block';
+        }
+    });
+
     // Tab switching logic
     window.openTool = (evt, toolName) => {
         const toolContents = document.getElementsByClassName('tool-content');

@@ -17,6 +17,8 @@
         <div class="tabs">
             <button class="tab-link active" onclick="openTool(event, 'load-tester')">Load Tester</button>
             <button class="tab-link" onclick="openTool(event, 'estimator')">Concurrent User Estimator</button>
+            <button class="tab-link" onclick="openTool(event, 'aad-token-generator')">AAD Token Generator</button>
+            <button class="tab-link" onclick="openTool(event, 'jwt-decoder')">JWT Decoder</button>
         </div>
 
         <div id="load-tester" class="tool-content">
@@ -145,6 +147,50 @@
                     </div>
                 </form>
                 <div id="estimator-result" class="estimator-result"></div>
+            </div>
+        </div>
+        <div id="aad-token-generator" class="tool-content" style="display:none;">
+            <div class="form-container">
+                <h2>AAD Token Generator</h2>
+                <form id="aad-token-form">
+                    <div class="form-group">
+                        <label for="application-id">Application ID</label>
+                        <input type="text" id="application-id" name="application_id" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="application-secret">Application Secret</label>
+                        <input type="password" id="application-secret" name="application_secret" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="api-scope">API Scope</label>
+                        <input type="text" id="api-scope" name="api_scope" required>
+                    </div>
+                    <div class="buttons">
+                        <button type="button" id="generate-token-btn">Generate Token</button>
+                    </div>
+                </form>
+                <div id="token-result-container" class="result-container" style="display:none;">
+                    <h3>Generated Token:</h3>
+                    <pre id="token-result"></pre>
+                </div>
+            </div>
+        </div>
+        <div id="jwt-decoder" class="tool-content" style="display:none;">
+            <div class="form-container">
+                <h2>JWT Decoder</h2>
+                <form id="jwt-decode-form">
+                    <div class="form-group">
+                        <label for="jwt-token">JWT Token</label>
+                        <textarea id="jwt-token" name="jwt_token" rows="8" required></textarea>
+                    </div>
+                    <div class="buttons">
+                        <button type="button" id="decode-jwt-btn">Decode Token</button>
+                    </div>
+                </form>
+                <div id="jwt-decoded-result-container" class="result-container" style="display:none;">
+                    <h3>Decoded Payload:</h3>
+                    <pre id="jwt-decoded-result"></pre>
+                </div>
             </div>
         </div>
     </div>

@@ -435,3 +435,13 @@ canvas {
 .log-line:hover {
     background-color: #e9ecef;
 }
+
+.result-container pre {
+    background-color: #e9ecef;
+    padding: 15px;
+    border-radius: 4px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    max-height: 400px;
+    overflow-y: auto;
+}

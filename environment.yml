@@ -10,3 +10,4 @@ dependencies:
   - aiofiles
   - jinja2
   - aiohttp
+  - msal

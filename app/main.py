@@ -26,6 +26,8 @@ import os
 from locust_runner import LocustRunner
 from port_manager import PortManager
 import logging
+from msal import ConfidentialClientApplication
+from fastapi import Body
 
 # Initialize FastAPI application
 app = FastAPI(
@@ -106,6 +108,36 @@ async def get_logs(session_id: str):
     except Exception as e:
         logger.error(f"Error reading log file: {e}")
         return {"logs": [], "error": str(e)}
+
+@app.post("/generate_aad_token")
+async def generate_aad_token(
+    application_id: str = Body(...),
+    application_secret: str = Body(...),
+    api_scope: str = Body(...)
+):
+    """
+    Generate an Azure Active Directory (AAD) token.
+    """
+    try:
+        authority = "https://login.microsoftonline.com/83ba98e9-2851-416c-9d81-c0bee20bb7f3"
+        
+        msal_client = ConfidentialClientApplication(
+            client_id=application_id,
+            authority=authority,
+            client_credential=application_secret
+        )
+
+        token_response = msal_client.acquire_token_for_client(scopes=[api_scope])
+        
+        if "access_token" in token_response:
+            return {"access_token": token_response["access_token"]}
+        else:
+            error_description = token_response.get("error_description", "Unknown error")
+            return {"error": "Failed to acquire token", "details": error_description}
+            
+    except Exception as e:
+        logger.error(f"Error generating AAD token: {e}")
+        return {"error": "An unexpected error occurred", "details": str(e)}
 
 async def stream_locust_stats(sid):
     """
