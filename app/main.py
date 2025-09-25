@@ -153,6 +153,7 @@ async def connect(sid, environ):
     async def timeout_task():
         await asyncio.sleep(600)
         logger.info(f"Timeout for session {sid}. Disconnecting client.")
+        await sio.emit('test_stopped', {'message': 'Timeout: Stopping load testing for safety reasons (max 10 minutes).  Please contact the administrator if you want to increase the timeout.'}, to=sid)
         await stop_load_test(sid)
         await sio.disconnect(sid)
 
@@ -285,13 +286,14 @@ async def stop_load_test(sid):
         sid (str): Socket.IO session identifier
     """
     logger.info(f"Stopping load test for {sid}")
-    await sio.emit('test_stopped', {'message': 'Timeout: Stopping load testing for safety reasons (max 10 minutes).  Please contact the administrator if you want to increase the timeout.'}, to=sid)
+    
     runner = runners.get(sid)
     if runner:
         try:
             await runner.stop()
-        finally:
-            await sio.emit('test_stopped', {'message': 'Load testing has stopped for safety reasons (max 10 minutes).  Please contact the administrator if you want to increase the timeout.'}, to=sid)
+        except Exception as e:
+            logger.error(f"Error stopping load test for {sid}: {e}")
+            await sio.emit('error', {'message': str(e)}, to=sid)
 
 if __name__ == '__main__':
     """

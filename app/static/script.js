@@ -11,6 +11,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const jsonPayloadTextarea = document.getElementById('json_payload');
     const clearJsonBtn = document.getElementById('clear-json');
     const logContainer = document.getElementById('log-container');
+    const formToggle = document.getElementById('form-toggle');
+    const collapsibleContent = document.getElementById('collapsible-content');
+    const toggleArrow = document.getElementById('toggle-arrow');
+
+    formToggle.addEventListener('click', () => {
+        collapsibleContent.classList.toggle('collapsed');
+        toggleArrow.classList.toggle('arrow-down');
+        toggleArrow.classList.toggle('arrow-up');
+    });
 
     let rpsChart, responseTimeChart;
     let logPollingInterval = null;
@@ -177,6 +186,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const logContent = logContainer?.querySelector('.log-content');
         if (logContent) logContent.innerHTML = '';
         startLogPolling(); // Start polling logs
+
+        // Collapse the form
+        if (!collapsibleContent.classList.contains('collapsed')) {
+            collapsibleContent.classList.add('collapsed');
+            toggleArrow.classList.remove('arrow-down');
+            toggleArrow.classList.add('arrow-up');
+        }
     });
 
     stopBtn.addEventListener('click', () => {
@@ -387,4 +403,20 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
         }
     });
+
+    // Tab switching logic
+    window.openTool = (evt, toolName) => {
+        const toolContents = document.getElementsByClassName('tool-content');
+        for (let i = 0; i < toolContents.length; i++) {
+            toolContents[i].style.display = 'none';
+        }
+
+        const tabLinks = document.getElementsByClassName('tab-link');
+        for (let i = 0; i < tabLinks.length; i++) {
+            tabLinks[i].className = tabLinks[i].className.replace(' active', '');
+        }
+
+        document.getElementById(toolName).style.display = 'block';
+        evt.currentTarget.className += ' active';
+    };
 });
