@@ -193,6 +193,13 @@ h1, h2 {
     box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
 }
 
+.form-group small {
+    display: block;
+    margin-top: 8px;
+    font-size: 14px;
+    color: #6c757d;
+}
+
 textarea {
     resize: vertical;
     font-family: 'Courier New', monospace;

@@ -118,6 +118,7 @@
                     <div class="form-group">
                         <label for="dau">Number of Daily Active Users (DAU)</label>
                         <input type="number" id="dau" name="dau" required min="1" value="3000">
+                        <small>Total unique users who engage with the application in a 24-hour period.</small>
                     </div>
                     <div class="form-group">
                         <label for="session-length">Daily Average Session Length</label>
@@ -127,6 +128,7 @@
                             <option value="40">40 minutes (e.g., social media)</option>
                             <option value="120">120 minutes (e.g., Teams)</option>
                         </select>
+                        <small>The average cumulative length of http requests per user per day. For example, if a user makes 10 requests per day, and the average request length is 20 minutes, the daily average session length is 200 minutes.</small>
                     </div>
                     <div class="form-group">
                         <label for="active-hours">Userbase Active Hours</label>
@@ -134,6 +136,7 @@
                             <option value="8">8 hours (during work hours)</option>
                             <option value="24">24 hours (all day)</option>
                         </select>
+                        <small>The time window during which the majority of your users are active. Select '8 hours' for applications used primarily during business hours, or '24 hours' for applications with a global user base.</small>
                     </div>
                     <div class="form-group">
                         <label for="peak-factor">Peak Factor</label>
@@ -141,6 +144,7 @@
                             <option value="2">Soft Peak (2x)</option>
                             <option value="4">Heavy Peak (4x)</option>
                         </select>
+                        <small>A multiplier to account for peak traffic. A 'Soft Peak' (2x) is common, while a 'Heavy Peak' (4x) might be used for events like product launches or marketing campaigns.</small>
                     </div>
                     <div class="buttons">
                         <button type="button" id="calculate-btn">Calculate Peak Usage</button>
@@ -168,6 +172,7 @@
                     <div class="buttons">
                         <button type="button" id="generate-token-btn">Generate Token</button>
                     </div>
+                    <small>Below is the generate aad token, please copy and paste it into the Bearer Token field in the Load Tester tab. You can also verify its content using the JWT Decoder tab.</small>
                 </form>
                 <div id="token-result-container" class="result-container" style="display:none;">
                     <h3>Generated Token:</h3>
