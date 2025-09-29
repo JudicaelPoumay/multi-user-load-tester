@@ -24,4 +24,4 @@ COPY --chown=python:python src/src/ .
 USER 999
 
 ENV PATH="/usr/app/venv/bin:$PATH"
-CMD ["uvicorn","main:asgi","--host", "0.0.0.0","--port","8080"]
+CMD ["uvicorn","main:socket_app","--host", "0.0.0.0","--port","8080"]
