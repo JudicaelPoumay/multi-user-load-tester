@@ -1,0 +1,15 @@
+variables:
+  #GLOBAL
+  - template: default_variables.yml
+    parameters:
+      environment: "gtu"
+      indexAks: "002"
+      purpose: "predict"
+  - name: environment
+    value: "gtu"
+  - name: environmentInitial
+    value: "g"
+  - name: purposeInitial
+    value: "p"
+  - name: keyvaultKubernetes
+    value: kv-geai-locst-lt-gtu-001

@@ -1,0 +1,185 @@
+trigger: none
+
+parameters:
+  - name: environment
+    displayName: "Environment"
+    type: string
+    values:
+      - "gtu"
+      - "tst"
+      - "uat"
+      - "prd"
+      - 'trainprd'
+    default: "gtu"
+  - name: APIServicePrincipal
+    displayName: "API Service Principal"
+    type: string
+  - name: scope
+    displayName: "API scope"
+    type: string
+  - name: Bfunction
+    displayName: "Bfunction"
+    type: string
+  - name: CreateServicePrincipal
+    displayName: "Create SP"
+    type: boolean
+    default: true
+  - name: UpdateServicePrincipal
+    displayName: "Update SP"
+    type: boolean
+    default: true
+  - name: produceAadToken
+    displayName: "Produce AAD token"
+    type: boolean
+    default: true
+
+variables:
+  - template: ${{ format('../variables/default_variables_{0}.yml', lower( parameters.environment )) }}
+  - name: appName
+    value: "btest"
+
+
+resources:
+  containers:
+    - container: ccoe-product
+      image: ${{variables.agentContainerImage}}
+      endpoint: sc-acr-tooling-prod-${{ variables.applicationCode }}
+  repositories:
+    - repository: devops-template
+      type: git
+      name: geai/devops-template
+
+pool:
+  name: self-hosted-vmss-ubuntu-prd-we
+  
+stages:
+  - stage: CreateServicePrincipal
+    condition: eq('${{ parameters.CreateServicePrincipal }}', 'true')
+    jobs:
+      - template: pipeline_templates/jobs_iac_appRegistration_create_custom.yml@devops-template
+        parameters:
+          environment: ${{ variables.environment }}
+          resourceGroupName: ${{ variables.resourceGroupName }}
+          appName: '${{ variables.appName }}-be'
+          keyVaultName: ${{ variables.keyvaultKubernetes }}
+          azureSubscription: ${{ variables.azureSubscription }}
+          applicationCode: ${{ variables.applicationCode }}
+          clientApplicationName: ${{ variables.clientApplicationCode }}
+          bFunction: ${{ variables.bFunction }}
+          appLongName: ${{ variables.appName }}
+          appRegistrationPurpose: '${{ variables.appName }}-be'
+          setPassword: true
+          identifierUris: 'api://${{variables.applicationCode}}-${{parameters.environment}}-${{variables.appName}}-be'
+          claimsMappingPolicyAction: 'Enable'
+          claimsMappingPolicyId: '278c84f8-6372-40f3-b38c-f4ebf763c693'
+          idToken: |
+            {
+                "idToken": [
+                    {
+                        "name": "xms_pl"
+                    },
+                    {
+                        "name": "upn"
+                    }
+                ]
+            }
+          oauth2PermissionScopes: |
+            {
+              "oauth2PermissionScopes": [
+                  {
+                      "adminConsentDescription": "Default",
+                      "adminConsentDisplayName": "Default",
+                      "isEnabled": true,
+                      "type": "Admin",
+                      "userConsentDescription": null,
+                      "userConsentDisplayName": null,
+                      "value": "Default"
+                  }
+                ]
+            }
+  - stage: UpdateAppRegistrationWithoutAdminConsentBackend
+    condition: eq('${{ parameters.UpdateServicePrincipal }}', 'true')
+    dependsOn: CreateServicePrincipal
+    jobs:
+      - template: pipeline_templates/jobs_iac_appRegistration_update.yml@devops-template
+        parameters:
+          environment: ${{ variables.environment }}
+          azureSubscription: ${{ variables.azureSubscription }}
+          requiredResourceAccess: |
+            {
+              "requiredResourceAccesses": [
+                  {
+                      "applicationName": "${{parameters.APIServicePrincipal}}",
+                      "ResourceAccesses": [
+                          {
+                            "Type": "Role",
+                            "ResourceAccessName": "${{parameters.Bfunction}}"
+                          }
+                      ]
+                  },
+              ]
+            }
+          appAid: ${{ variables.appAid }}
+          purpose: ${{ variables.appName }}-be
+          performAdminConsent: false
+
+  - stage: DelayBackend
+    condition: eq('${{ parameters.UpdateServicePrincipal }}', 'true')
+    dependsOn: UpdateAppRegistrationWithoutAdminConsentBackend
+    jobs:
+      - job: DelayBackend
+        pool: server
+        steps:
+          - task: Delay@1
+            displayName: 'Wait 2 min before Performing Admin Consent'
+            inputs:
+              delayForMinutes: '2'
+
+  - stage: UpdateAppRegistrationWithAdminConsentBackend
+    condition: eq('${{ parameters.UpdateServicePrincipal }}', 'true')
+    dependsOn: DelayBackend
+    jobs:
+      - template: pipeline_templates/jobs_iac_appRegistration_update.yml@devops-template
+        parameters:
+          environment: ${{ variables.environment }}
+          azureSubscription: ${{ variables.azureSubscription }}
+          requiredResourceAccess: |
+            {
+              "requiredResourceAccesses": [
+                  {
+                      "applicationName": "${{parameters.APIServicePrincipal}}",
+                      "ResourceAccesses": [
+                          {
+                            "Type": "Role",
+                            "ResourceAccessName": "${{parameters.Bfunction}}"
+                          }
+                      ]
+                  },
+              ]
+            }
+          appAid: ${{ variables.appAid }}
+          purpose: ${{ variables.appName }}-be
+          performAdminConsent: true
+  - stage: produceaad
+    displayName: Produce AAD Token
+    dependsOn: UpdateAppRegistrationWithAdminConsentBackend
+    condition: eq('${{ parameters.produceAadToken }}', 'true')
+    jobs:
+      - job: produceaadtoken
+        container: ccoe-product
+        steps:
+          - task: AzureKeyVault@1
+            inputs:
+              azureSubscription: ${{variables.azureSubscription}}
+              KeyVaultName: ${{ variables.keyvaultKubernetes }}
+              SecretsFilter: "clientid-${{variables.applicationCode}}-${{variables.environment}}-${{variables.appName}}-be,clientsecret-${{variables.applicationCode}}-${{variables.environment}}-${{variables.appName}}-be"
+              RunAsPreJob: false
+          - bash: |          
+              curl -X POST https://login.microsoftonline.com/83ba98e9-2851-416c-9d81-c0bee20bb7f3/oauth2/v2.0/token -H "Content-Type: application/x-www-form-urlencoded" -d "grant_type=client_credentials&client_id=$(clientid-${{variables.applicationCode}}-${{variables.environment}}-${{variables.appName}}-be)&client_secret=$(clientsecret-${{variables.applicationCode}}-${{variables.environment}}-${{variables.appName}}-be)&scope=${{parameters.scope}}" > output.log
+
+          - task: PublishPipelineArtifact@1
+            inputs:
+              targetPath: 'output.log'
+              artifact: 'PipelineLogs'
+              publishLocation: 'pipeline'
+            displayName: 'Publish output log as artifact'              
