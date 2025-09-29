@@ -15,4 +15,3 @@ pyjwt
 asgiref
 uvicorn
 eventlet
-itsdangerous

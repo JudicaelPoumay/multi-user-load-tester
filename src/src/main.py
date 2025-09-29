@@ -1,7 +1,7 @@
 """
 Multi-User Load Testing Application
 
-A FastAPI-based web application that provides isolated load testing capabilities
+A Flask-based web application that provides isolated load testing capabilities
 for multiple concurrent users. Each user session gets its own Locust instance
 with custom test configurations.
 
@@ -14,35 +14,26 @@ Key Features:
 
 Author: JudicaelPoumay
 """
+
+from flask import Flask, request, jsonify, render_template, session, has_request_context,redirect, url_for
+from flask_socketio import SocketIO
+import jwt
 import asyncio
 import json
-import logging
 import os
-import tempfile
-from typing import Optional, Dict, Any
-
-import jwt
-import socketio
-import uvicorn
-from fastapi import FastAPI, Request, HTTPException, Depends
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-from itsdangerous import URLSafeSerializer
-from msal import ConfidentialClientApplication
-from pydantic import BaseModel
-
 from locust_runner import LocustRunner
 from port_manager import PortManager
+import logging
+from msal import ConfidentialClientApplication, TokenCache
+from werkzeug.middleware.proxy_fix import ProxyFix
+from security.belfius_security import get_user_groups_memberships, get_userinfo
+from flask_dance.consumer import oauth_authorized
+from security.belfius_sso_azure import azure, make_azure_blueprint
+from asgiref.wsgi import WsgiToAsgi
 
-# from security.belfius_security import get_user_groups_memberships, get_userinfo
-# from security.belfius_sso_azure import azure, make_azure_blueprint
-
-
-# Initialize FastAPI application
-app = FastAPI()
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+# Initialize Flask application
+app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
 
 # Configure logging for the application
@@ -50,211 +41,147 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Socket.IO server setup for real-time communication
-sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins="*")
-socket_app = socketio.ASGIApp(sio, other_asgi_app=app)
-
+socketio = SocketIO(app, async_mode='eventlet', cors_allowed_origins="*")
 
 # Global session management
 # Dictionary to hold active locust runner instances for each user session
-runners: Dict[str, LocustRunner] = {}
-timeout_tasks: Dict[str, asyncio.Task] = {}
+runners = {}
+timeout_tasks = {}
 
 # Port manager instance to allocate unique ports for each Locust instance
 port_manager = PortManager()
 
+REDIRECT_PATH = "/getAToken"  # Used for forming an absolute URL to your redirect URI
 
-# --- Authentication Configuration ---
-CLIENT_ID = os.environ.get("APPLICATION_ID")
-CLIENT_SECRET = os.environ.get("APPLICATION_SECRET")
-TENANT_ID = "83ba98e9-2851-416c-9d81-c0bee20bb7f3"
-AUTHORITY = f"https://login.microsoftonline.com/{TENANT_ID}"
+app.config.update(SECRET_KEY=os.environ.get("APPLICATION_SIGNATURE_KEY"))
 
-# The backend scope is kept separate, as in the original Flask app's configuration.
-BACKEND_SCOPE = os.environ.get("BACKEND_APPLICATION_SCOPE", "api://your-app-id/.default")
+blueprint = make_azure_blueprint(
+    client_id=os.environ.get("APPLICATION_ID"),
+    client_secret=os.environ.get("APPLICATION_SECRET"),
+    tenant="83ba98e9-2851-416c-9d81-c0bee20bb7f3",
+    domain_hint="belfius.be",
+    scope=[os.environ.get("BACKEND_APPLICATION_SCOPE")],
+)
 
-# Scopes for the authorization request, similar to what Flask-Dance requested.
-AUTH_REQUEST_SCOPES = ["openid", "profile", "email"]
-
-# Scopes for the token acquisition, requesting user profile, offline access, and the backend API token.
-TOKEN_ACQUISITION_SCOPES = ["openid", "profile", "email", "offline_access", BACKEND_SCOPE]
-
-REDIRECT_PATH = "/auth/callback"
-
-# Session management
-SECRET_KEY = os.environ.get("APPLICATION_SIGNATURE_KEY", "a_very_secret_key")
-serializer = URLSafeSerializer(SECRET_KEY)
-
-
-msal_client = ConfidentialClientApplication(
-    client_id=CLIENT_ID,
-    authority=AUTHORITY,
-    client_credential=CLIENT_SECRET
+client = ConfidentialClientApplication(
+    client_id=os.environ.get("APPLICATION_ID"),
+    authority="https://login.microsoftonline.com/83ba98e9-2851-416c-9d81-c0bee20bb7f3",
+    client_credential=os.environ.get("APPLICATION_SECRET")
 )
 
 
-# --- Authentication Middleware and Dependencies ---
-async def get_session(request: Request):
-    session_cookie = request.cookies.get("session")
-    if session_cookie:
-        try:
-            return serializer.loads(session_cookie)
-        except Exception:
-            return {}
-    return {}
+sso_prefix = "/login"
+app.register_blueprint(blueprint, url_prefix=sso_prefix)
 
+@oauth_authorized.connect
+def redirect_to_next_url(blueprint, token):
+    """
+    Make sure we redirect to the original url when SSO is completed
+    """
 
-async def get_current_user(session: dict = Depends(get_session)):
-    if "user" not in session:
-        return None
-    # TODO: Check for token expiry
-    return session["user"]
+    print("redirect_to_next_url :", str(token), flush=True)
+    blueprint.token = token
+    session["access_token"] = token.get("access_token")
+    id_claims = jwt.decode(token.get("id_token"), options={"verify_signature": False})
+    session["user_id"] = id_claims.get("mailnickname")
+    next_url = session["next_url"]
+    return redirect(next_url)
 
+def check_user_groups():
+    if has_request_context():
+        user_info = get_userinfo()
+        ALLOWED_USERS = ["baerta", "poumaj", "poullj"]
 
-async def require_auth(request: Request, user: dict = Depends(get_current_user)):
-    if not user:
-        # Store original URL to redirect after SSO
-        session = await get_session(request)
-        session["next_url"] = str(request.url)
-        response = RedirectResponse(url="/login")
-        response.set_cookie(key="session", value=serializer.dumps(session))
-        return response
-    return user
+        if ALLOWED_USERS and user_info:
+            print(ALLOWED_USERS)
+            print(user_info.get("userid").lower())
+            if user_info and user_info.get("userid").lower() in ALLOWED_USERS:
+                return True
 
-
-@app.get("/login")
-async def login(request: Request):
-    session = await get_session(request)
-    auth_url_params = {
-        "scopes": AUTH_REQUEST_SCOPES,
-        "response_type": "code",
-        "redirect_uri": str(request.url_for('auth_callback')),
-    }
-    auth_url = msal_client.get_authorization_request_url(**auth_url_params)
-    session["state"] = auth_url_params.get("state") # MSAL generates a state
-    response = RedirectResponse(url=auth_url)
-    response.set_cookie(key="session", value=serializer.dumps(session))
-    return response
-
-@app.get("/auth/callback", name="auth_callback")
-async def auth_callback(request: Request, code: str, state: str):
-    session = await get_session(request)
-    if state != session.get("state"):
-        raise HTTPException(status_code=400, detail="State mismatch")
-
-    try:
-        token_response = msal_client.acquire_token_by_authorization_code(
-            code,
-            scopes=TOKEN_ACQUISITION_SCOPES,
-            redirect_uri=str(request.url_for('auth_callback'))
-        )
-
-        if "access_token" in token_response:
-            id_token_claims = jwt.decode(token_response['id_token'], options={"verify_signature": False})
-            session["user"] = {
-                "name": id_token_claims.get("name"),
-                "email": id_token_claims.get("preferred_username"),
-                "oid": id_token_claims.get("oid"),
-                "userid": id_token_claims.get("mailnickname"),
-                "roles": id_token_claims.get("roles", []),
-            }
-            session["access_token"] = token_response["access_token"]
-
-            next_url = session.get("next_url", "/")
-            response = RedirectResponse(url=next_url)
-            response.set_cookie(key="session", value=serializer.dumps(session))
-            return response
-        else:
-            logger.error(f"Error acquiring token: {token_response.get('error_description')}")
-            raise HTTPException(status_code=400, detail="Failed to acquire token.")
-
-    except Exception as e:
-        logger.error(f"Error during token acquisition: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-
-def check_user_groups_fastapi(user: dict) -> bool:
-    if not user:
+        required_groups = ['LoadTesterUser']
+        groups = get_user_groups_memberships()
+        if(groups):
+            return any([role in groups for role in required_groups])
         return False
-
-    userid = user.get("userid", "").lower()
-    ALLOWED_USERS = ["baerta", "poumaj", "poullj"]
-
-    if userid in ALLOWED_USERS:
-        return True
-
-    required_groups = ['LoadTesterUser']
-    user_roles = user.get("roles", [])
-    if any(role in user_roles for role in required_groups):
-        return True
-
     return False
 
-# --- Routes ---
-@app.get("/", response_class=HTMLResponse)
-async def index(request: Request, user: dict = Depends(require_auth)):
-    if isinstance(user, RedirectResponse):
-        return user
-    
-    if not check_user_groups_fastapi(user):
-        return templates.TemplateResponse("403.html", {"request": request}, status_code=403)
+def login_required(func):
+    def check_authorization(*args, **kwargs):
+        if not azure.authorized or azure.token.get("expires_in") < 0:
+            # Save original URL to redirect after SSO
+            session["next_url"] = request.path
+            if len(request.args) > 0:
+                session["next_url"] = (
+                    session["next_url"] + "?" + urlparse.urlencode(request.args)
+                )
 
-    return templates.TemplateResponse("index.html", {"request": request, "user": user})
+            # redirect to azure login page
+            return redirect(url_for("azure.login"))
+        else:
+            return func(*args, **kwargs)
 
+    return check_authorization
 
-@app.get("/logs/{session_id}")
-async def get_logs(session_id: str, user: dict = Depends(require_auth)):
+@app.route("/")
+@login_required
+def index():
+    if not check_user_groups():
+        return render_template("403.html"), 403
+    return render_template("index.html")
+
+@app.route("/logs/<session_id>")
+def get_logs(session_id):
     """
     Retrieve the last 100 log entries for a specific user session.
     """
     runner = runners.get(session_id)
     if not runner:
-        raise HTTPException(status_code=404, detail="Session not found")
+        return jsonify({"error": "Session not found"}), 404
 
+    # Get the log file path associated with this session
     log_file_path = getattr(runner, '_session_log_file', None)
     if not log_file_path or not os.path.exists(log_file_path):
-        return JSONResponse(content={"logs": []})
+        return jsonify({"logs": []})
 
     try:
         with open(log_file_path, 'r', encoding='utf-8') as f:
             lines = f.readlines()
-            return JSONResponse(content={"logs": [line.strip() for line in lines[-100:]]})
+            # Return last 100 lines for efficient display
+            return jsonify({"logs": [line.strip() for line in lines[-100:]]})
     except Exception as e:
         logger.error(f"Error reading log file: {e}")
-        raise HTTPException(status_code=500, detail=f"Error reading log file: {e}")
+        return jsonify({"logs": [], "error": str(e)}), 500
 
-
-class AADTokenRequest(BaseModel):
-    application_id: str
-    application_secret: str
-    api_scope: str
-
-
-@app.post("/generate_aad_token")
-async def generate_aad_token(token_request: AADTokenRequest, user: dict = Depends(require_auth)):
+@app.route("/generate_aad_token", methods=["POST"])
+def generate_aad_token():
     """
     Generate an Azure Active Directory (AAD) token.
     """
     try:
+        data = request.get_json()
+        application_id = data.get("application_id")
+        application_secret = data.get("application_secret")
+        api_scope = data.get("api_scope")
+
         authority = "https://login.microsoftonline.com/83ba98e9-2851-416c-9d81-c0bee20bb7f3"
 
         msal_client = ConfidentialClientApplication(
-            client_id=token_request.application_id,
+            client_id=application_id,
             authority=authority,
-            client_credential=token_request.application_secret
+            client_credential=application_secret
         )
 
-        token_response = msal_client.acquire_token_for_client(scopes=[token_request.api_scope])
+        token_response = msal_client.acquire_token_for_client(scopes=[api_scope])
 
         if "access_token" in token_response:
-            return JSONResponse(content={"access_token": token_response["access_token"]})
+            return jsonify({"access_token": token_response["access_token"]})
         else:
             error_description = token_response.get("error_description", "Unknown error")
-            raise HTTPException(status_code=400, detail=f"Failed to acquire token: {error_description}")
+            return jsonify({"error": "Failed to acquire token", "details": error_description}), 400
 
     except Exception as e:
         logger.error(f"Error generating AAD token: {e}")
-        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
-
+        return jsonify({"error": "An unexpected error occurred", "details": str(e)}), 500
 
 async def stream_locust_stats(sid):
     """
@@ -268,13 +195,12 @@ async def stream_locust_stats(sid):
         # Continuously stream statistics until the session ends
         async for stats in runner.stats():
             logger.info(f"Emitting stats for {sid}: {stats}")
-            await sio.emit('stats', stats, to=sid)
+            socketio.emit('stats', stats, to=sid)
     except Exception as e:
         logger.error(f"Error streaming stats for {sid}: {e}")
 
-
-@sio.event
-async def connect(sid, environ):
+@socketio.on('connect')
+def handle_connect(sid):
     """
     Handle new client connections.
     """
@@ -287,22 +213,22 @@ async def connect(sid, environ):
     # Create a new isolated LocustRunner for this session
     runners[sid] = LocustRunner(port=port)
 
-    async def timeout_task():
-        await asyncio.sleep(600)
+    def timeout_task():
+        socketio.sleep(600)
         logger.info(f"Timeout for session {sid}. Disconnecting client.")
-        await sio.emit('test_stopped', {'message': 'Timeout: Stopping load testing for safety reasons (max 10 minutes). Please contact the administrator if you want to increase the timeout.'}, to=sid)
-        await handle_stop_load_test(sid, None)
-        await sio.disconnect(sid)
+        socketio.emit('test_stopped', {'message': 'Timeout: Stopping load testing for safety reasons (max 10 minutes). Please contact the administrator if you want to increase the timeout.'}, to=sid)
+        stop_load_test(sid)
+        socketio.disconnect(sid)
 
-    task = asyncio.create_task(timeout_task())
+    task = socketio.start_background_task(timeout_task)
     timeout_tasks[sid] = task
 
-
-@sio.event
-async def disconnect(sid):
+@socketio.on('disconnect')
+def handle_disconnect(sid):
     """
     Handle client disconnections and clean up resources.
     """
+    
     logger.info(f"Client disconnected: {sid}")
 
     if sid in timeout_tasks:
@@ -313,7 +239,7 @@ async def disconnect(sid):
         runner = runners[sid]
 
         # Stop the Locust subprocess
-        await runner.stop()
+        asyncio.run(runner.stop())
 
         # Clean up session-specific log file
         session_log_file = getattr(runner, '_session_log_file', None)
@@ -329,12 +255,12 @@ async def disconnect(sid):
         port_manager.release_port(sid)
         logger.info(f"Released port for session {sid}")
 
-
-@sio.event
-async def start_load_test(sid, data):
+@socketio.on('start_load_test')
+def handle_start_load_test(sid, data):
     """
     Start a custom load test for a specific user session.
     """
+
     logger.info(f"Starting load test for {sid} with data: {data}")
     runner = runners.get(sid)
     if runner:
@@ -352,7 +278,7 @@ async def start_load_test(sid, data):
 
             # Validate required parameters
             if not all([host, num_users, spawn_rate]):
-                await sio.emit('error', {'message': 'Missing required parameters.'}, to=sid)
+                socketio.emit('error', {'message': 'Missing required parameters.'}, to=sid)
                 return
 
             # Validate and parse JSON payload if provided
@@ -361,13 +287,14 @@ async def start_load_test(sid, data):
                 try:
                     parsed_json = json.loads(json_payload)
                 except json.JSONDecodeError:
-                    await sio.emit('error', {'message': 'Invalid JSON payload.'}, to=sid)
+                    socketio.emit('error', {'message': 'Invalid JSON payload.'}, to=sid)
                     return
 
             # Get bearer token if provided
             bearer_token = data.get('bearer_token', '').strip()
 
             # Create a temporary log file for session-specific request logging
+            import tempfile
             fd_log, log_file_path = tempfile.mkstemp(
                 suffix='.log',
                 prefix=f'port_{runners[sid]._locust_port}_'
@@ -380,36 +307,39 @@ async def start_load_test(sid, data):
             )
 
             # Start the Locust subprocess with the custom configuration
-            await runner.start(host, num_users, spawn_rate, locustfile_content)
+            asyncio.run(runner.start(host, num_users, spawn_rate, locustfile_content))
 
             # Store log file reference for later access via REST API
             runner._session_log_file = log_file_path
 
             # Start background task to stream real-time statistics
-            asyncio.create_task(stream_locust_stats(sid))
+            socketio.start_background_task(stream_locust_stats, sid)
 
         except Exception as e:
             logger.error(f"Error starting load test for {sid}: {e}")
-            await sio.emit('error', {'message': str(e)}, to=sid)
+            socketio.emit('error', {'message': str(e)}, to=sid)
 
-
-@sio.event
-async def stop_load_test(sid, data):
+@socketio.on('stop_load_test')
+def handle_stop_load_test(sid):
     """
     Stop the load test for a specific user session.
     """
+    
     logger.info(f"Stopping load test for {sid}")
+
     runner = runners.get(sid)
     if runner:
         try:
-            await runner.stop()
+            asyncio.run(runner.stop())
         except Exception as e:
             logger.error(f"Error stopping load test for {sid}: {e}")
-            await sio.emit('error', {'message': str(e)}, to=sid)
+            socketio.emit('error', {'message': str(e)}, to=sid)
 
+
+asgi = WsgiToAsgi(app)
 
 if __name__ == '__main__':
     """
     Application entry point.
     """
-    uvicorn.run(socket_app, host='0.0.0.0', port=8080)
+    socketio.run(app, host='0.0.0.0', port=8080)
