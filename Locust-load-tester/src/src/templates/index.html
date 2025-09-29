@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Locust Web UI</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.4.1/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@2.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@1.2.1/dist/chartjs-plugin-zoom.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Multi-User Load Tester</h1>
+
+        <div class="tabs">
+            <button class="tab-link active" onclick="openTool(event, 'load-tester')">Load Tester</button>
+            <button class="tab-link" onclick="openTool(event, 'estimator')">Concurrent User Estimator</button>
+            <button class="tab-link" onclick="openTool(event, 'aad-token-generator')">AAD Token Generator</button>
+            <button class="tab-link" onclick="openTool(event, 'jwt-decoder')">JWT Decoder</button>
+        </div>
+
+        <div id="load-tester" class="tool-content">
+            <div class="form-container">
+                <form id="locust-form">
+                    <div class="collapsible-header" id="form-toggle">
+                        <h3>Test Configuration</h3>
+                        <span id="toggle-arrow" class="arrow-down"></span>
+                    </div>
+                    <div id="collapsible-content">
+                        <div class="form-group">
+                            <label for="host">Target Host</label>
+                            <input type="text" id="host" name="host" required placeholder="https://example.com">
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="num_users">Number of Users</label>
+                                <input type="number" id="num_users" name="num_users" required min="1" value="10">
+                            </div>
+                            <div class="form-group">
+                                <label for="spawn_rate">Spawn Rate</label>
+                                <input type="number" id="spawn_rate" name="spawn_rate" required min="1" value="1">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="http_method">HTTP Method</label>
+                            <select id="http_method" name="http_method" required>
+                                <option value="GET">GET</option>
+                                <option value="POST">POST</option>
+                                <option value="PUT">PUT</option>
+                                <option value="DELETE">DELETE</option>
+                                <option value="PATCH">PATCH</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="route">Route/Endpoint</label>
+                            <input type="text" id="route" name="route" placeholder="/api/endpoint" value="/">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="wait_time">Wait Time Between Requests (seconds)</label>
+                            <input type="number" id="wait_time" name="wait_time" min="0" step="0.1" value="1" placeholder="1.0">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="bearer_token">Bearer Token (optional)</label>
+                            <input type="text" id="bearer_token" name="bearer_token" placeholder="Enter Bearer Token">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="json_payload">JSON Payload (optional)</label>
+                            <div class="json-input-container">
+                                <textarea id="json_payload" name="json_payload" rows="6" placeholder='{"key": "value"}'></textarea>
+                                <div class="file-upload-section">
+                                    <label for="json_file" class="file-upload-label">
+                                        📁 Upload JSON File
+                                        <input type="file" id="json_file" accept=".json" style="display: none;">
+                                    </label>
+                                    <button type="button" id="clear-json" class="clear-btn">Clear</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="buttons">
+                        <button type="submit" id="start-btn">Start Load Test</button>
+                        <button type="button" id="stop-btn" disabled>Stop Load Test</button>
+                    </div>
+                </form>
+            </div>
+            <div id="error-container" class="error-message"></div>
+            <div id="stop-warning-container" class="warning-message"></div>
+            <div id="error-report-container" class="error-report"></div>
+            <div class="stats-container">
+                <h2>Live Statistics</h2>
+                <div id="stats" class="stats-grid"></div>
+                <div id="chart-warning" style="display: none;">
+                    0 request per second or 0 average response time means we haven't received a response from the server yet, please wait. The server you are testing may take up to a few minutes to answer depending on the task
+                </div>
+                <div class="charts">
+                    <canvas id="rpsChart"></canvas>
+                    <canvas id="responseTimeChart"></canvas>
+                </div>
+            </div>
+            <div id="log-container" class="log-container">
+                <h3>Request Log (Last 100 entries)</h3>
+                <div class="log-content"></div>
+            </div>
+        </div>
+        <div id="estimator" class="tool-content" style="display:none;">
+            <div class="estimator-container">
+                <h2>Peak Usage Estimator</h2>
+                <form id="estimator-form">
+                    <div class="form-group">
+                        <label for="dau">Number of Daily Active Users (DAU)</label>
+                        <input type="number" id="dau" name="dau" required min="1" value="3000">
+                        <small>Total unique users who engage with the application in a 24-hour period.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="session-length">Daily Average Session Length</label>
+                        <select id="session-length" name="session-length" required>
+                            <option value="5">5 minutes (e.g., bank app)</option>
+                            <option value="20">20 minutes (e.g., ChatGPT)</option>
+                            <option value="40">40 minutes (e.g., social media)</option>
+                            <option value="120">120 minutes (e.g., Teams)</option>
+                        </select>
+                        <small>The average cumulative length of http requests per user per day. For example, if a user makes 10 requests per day, and the average request length is 20 minutes, the daily average session length is 200 minutes.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="active-hours">Userbase Active Hours</label>
+                        <select id="active-hours" name="active-hours" required>
+                            <option value="8">8 hours (during work hours)</option>
+                            <option value="24">24 hours (all day)</option>
+                        </select>
+                        <small>The time window during which the majority of your users are active. Select '8 hours' for applications used primarily during business hours, or '24 hours' for applications with a global user base.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="peak-factor">Peak Factor</label>
+                        <select id="peak-factor" name="peak-factor" required>
+                            <option value="2">Soft Peak (2x)</option>
+                            <option value="4">Heavy Peak (4x)</option>
+                        </select>
+                        <small>A multiplier to account for peak traffic. A 'Soft Peak' (2x) is common, while a 'Heavy Peak' (4x) might be used for events like product launches or marketing campaigns.</small>
+                    </div>
+                    <div class="buttons">
+                        <button type="button" id="calculate-btn">Calculate Peak Usage</button>
+                    </div>
+                </form>
+                <div id="estimator-result" class="estimator-result"></div>
+            </div>
+        </div>
+        <div id="aad-token-generator" class="tool-content" style="display:none;">
+            <div class="form-container">
+                <h2>AAD Token Generator</h2>
+                <form id="aad-token-form">
+                    <div class="form-group">
+                        <label for="application-id">Application ID</label>
+                        <input type="text" id="application-id" name="application_id" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="application-secret">Application Secret</label>
+                        <input type="password" id="application-secret" name="application_secret" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="api-scope">API Scope</label>
+                        <input type="text" id="api-scope" name="api_scope" required>
+                    </div>
+                    <div class="buttons">
+                        <button type="button" id="generate-token-btn">Generate Token</button>
+                    </div>
+                    <small>Below is the generate aad token, please copy and paste it into the Bearer Token field in the Load Tester tab. You can also verify its content using the JWT Decoder tab.</small>
+                </form>
+                <div id="token-result-container" class="result-container" style="display:none;">
+                    <h3>Generated Token:</h3>
+                    <pre id="token-result"></pre>
+                </div>
+            </div>
+        </div>
+        <div id="jwt-decoder" class="tool-content" style="display:none;">
+            <div class="form-container">
+                <h2>JWT Decoder</h2>
+                <form id="jwt-decode-form">
+                    <div class="form-group">
+                        <label for="jwt-token">JWT Token</label>
+                        <textarea id="jwt-token" name="jwt_token" rows="8" required></textarea>
+                    </div>
+                    <div class="buttons">
+                        <button type="button" id="decode-jwt-btn">Decode Token</button>
+                    </div>
+                </form>
+                <div id="jwt-decoded-result-container" class="result-container" style="display:none;">
+                    <h3>Decoded Payload:</h3>
+                    <pre id="jwt-decoded-result"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+    <footer>
+        <p>For security reason, any load testing cannot last longer than 10 minutes, Please contact the administrator for an increase in the timeout.</p>
+    </footer>
+    <script src="/static/script.js"></script>
+</body>
+</html>

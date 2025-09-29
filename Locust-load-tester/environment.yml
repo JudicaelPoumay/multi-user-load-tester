@@ -1,0 +1,13 @@
+name: multi-user-load-tester
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - fastapi
+  - locust
+  - uvicorn
+  - python-socketio
+  - aiofiles
+  - jinja2
+  - aiohttp
+  - msal

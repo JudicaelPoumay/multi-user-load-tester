@@ -1,0 +1,176 @@
+parameters:
+  - name: environment
+    type: string
+  - name: purpose
+    type: string
+    default: 'predict'
+  - name: indexAks
+    type: string
+    default: '001'
+  - name: index
+    type: string
+    default: '001'
+
+
+variables:
+  # GLOBAL TO EDIT 
+  - name: longRegion
+    value: 'westeurope'
+  - name: region
+    value: 'we'
+  - name: regionInitial
+    value: 'w'
+  - name: applicationCode
+    value: 'geai'
+  - name: appName
+    value: 'ap-locust-lt'
+  - name: appLongName
+    value: 'ap-locust-lt'
+  - name: appShortName
+    value: 'locst-lt'
+  - name: appShortDescription
+    value: 'ap-locust-lt'
+  - name: appServicePort
+    value: 8080
+  - name: customerCode
+    value: 10
+  - name: alias
+    value: 'ap-locust-lt'
+
+
+  # AZURE DEVOPS PIPELINES
+  - name: ccoeProductRelease
+    value: release-1.6.1
+  - name: agentContainerImage
+    value: belfius/gemz/ccoe-product:${{variables.ccoeProductRelease}}
+
+  # APP BUILD
+  - name: fullTeamName
+    value: 'CxServer\SP\BB\${{variables.applicationCode}}'
+  - name: CheckmarxService
+    value: 'sc-cx-one-belfius-azurecloud-${{variables.applicationCode}}'
+  - name: repository
+    value: 'belfius/${{variables.applicationCode}}/${{ variables.appName }}'
+  - name: isDevelop
+    value: $[eq(variables['Build.SourceBranch'], 'refs/heads/develop')]
+  - name: notifyUsers
+    value: mle@belfius.be
+  - name: notifyTeamUsers
+    value: ${{ variables.applicationCode }}_team@belfius.be
+  - name: imageLatestVersionKey
+    value: ${{ variables.applicationCode }}-${{ variables.appName }}-LatestDeployedAppVersion
+  - name: index
+    value: ${{ parameters.index }}
+
+  # AZURE
+  - name: azureGTUSubscription
+    value: sc-arm-sub-spoke-${{variables.applicationCode}}-gtu-${{parameters.index}}
+  - name: azureSubscription
+    value: sc-arm-sub-spoke-${{variables.applicationCode}}-${{parameters.environment}}-${{parameters.index}}
+  - name: resourceGroupName
+    value: rg-${{variables.applicationCode}}-${{parameters.environment}}-we-${{parameters.index}}
+  - name: resourceManagerServiceConnectionName
+    value: sc-arm-sub-spoke-${{variables.applicationCode}}-${{parameters.environment}}-${{parameters.index}}
+
+  # APPLICATION REGISTRATION
+  - name: appRegistrationPurpose
+    value: '${{variables.applicationCode}}-${{variables.appShortName}}'
+  - name: servicePrincipalName
+    value: 'sp-${{variables.applicationCode}}-${{parameters.environment}}-${{ variables.appName }}'
+  - name: clientApplicationPurpose
+    value: '${{variables.appRegistrationPurpose}}'
+  - name: clientApplicationName
+    value: 'sp-${{variables.applicationCode}}-${{parameters.environment}}-${{variables.appRegistrationPurpose}}'
+  - name: keyVaultPurpose
+    value: ${{variables.applicationCode}}-${{variables.appShortName}}
+  - name: keyVaultName
+    value: kv-${{variables.keyvaultPurpose}}-${{parameters.environment}}-${{parameters.index}}
+  - name: keyVaultIndex
+    value: ${{parameters.index}}
+  - name: appAid
+    value: ${{variables.applicationCode}}
+  - name: appTestPurpose
+    value: ${{variables.appLongName}}
+  - name: appScope
+    value: ${{variables.appLongName}}.Read
+
+  - name: appRoles
+    value: |
+      {
+          "appRoles": [
+              {
+                  "allowedMemberTypes": [
+                      "User",
+                      "Application"
+                  ],
+                  "description": "LoadTesterUser",
+                  "displayName": "LoadTesterUser",
+                  "isEnabled": true,
+                  "origin": "Application",
+                  "value": "LoadTesterUser",
+                  "type": "Profile"
+              }                                                     
+          ]
+      }       
+
+  - name: appRequiredResourceAccess
+    value: |
+      {
+        "requiredResourceAccesses": [
+        ]
+      }
+
+  - name: appRegistrationFrontendRedirectUris
+    value: 'https://${{variables.applicationCode}}-${{parameters.environment}}-${{variables.alias}}.belwired.net/login/azure/authorized'
+   
+
+  # DOCKER & K8S
+  - name: containerRegistryUrl
+    value: 'acrccoenonprodwe001.azurecr.io'
+  - name: acrUrl
+    value: 'acrccoenonprodwe001.azurecr.io/shared/belfius/mle/images/uvicorn-gunicorn-fastapi:python3.10'
+  - name: kubernetesContainer
+    ${{ if in(parameters.environment, 'tst', 'gtu', 'ptp') }}:
+      value: acrccoenonprodwe001.azurecr.io/belfius/${{variables.applicationCode}}/${{ variables.appName }}
+    ${{ if in(parameters.environment, 'uat', 'prd') }}:
+      value: acrccoeprodwe001.azurecr.io/belfius/${{variables.applicationCode}}/${{ variables.appName }}
+  - name: containerRegistry
+    value: 'sc-acr-shared-nonprod-${{variables.applicationCode}}'
+  - name: kubernetesServiceConnection
+    value: sc-aks-${{variables.applicationCode}}-${{parameters.environment}}-${{variables.region}}-${{parameters.indexAks}}
+  - name: aksClusterName
+    value: aks-shared-${{parameters.environment}}-${{variables.region}}-${{parameters.indexAks}}
+  - name: destinationPort
+    value: 80
+
+  # ISTIO CONFIG / CERTIFICATE FILES
+  - name: certificateName
+    value: ${{ variables.applicationCode}}-${{parameters.environment}}-${{variables.alias}}
+  - name: certificateSubject
+    value: cn=${{ variables.certificateName}}
+  - name: certificateDnsNames
+    value: ${{ variables.certificateName}}
+  - name: base64CerKeyvaultSecret
+    value: tlsCertBase64
+  - name: base64KeyKeyvaultSecret
+    value: tlsKeyBase64
+  - name: ingressHostName
+    value: ${{ variables.applicationCode}}-${{parameters.environment}}-${{variables.alias}}.belwired.net
+  - name: ingressTlsKey
+    value: ${{ variables.applicationCode}}-${{parameters.environment}}-${{variables.alias}}-belwired-net-key
+  - name: ingressTlsCert
+    value: ${{ variables.applicationCode}}-${{parameters.environment}}-${{variables.alias}}-belwired-net-cert
+  - name: httpRoutes
+    value: |
+      [{
+        "applicationNamespace" : "${{ variables.applicationCode}}",
+        "applicationName": "${{variables.appRegistrationPurpose}}",
+       	"routeDestinationHost": "${{variables.appRegistrationPurpose}}.${{variables.applicationCode}}.svc.cluster.local",
+        "routeDestinationPort": ${{ variables.destinationPort }}
+      }]
+
+  # DR
+  - name: failoverRegion
+    value: 'northeurope'
+  - name: pipelineId
+    value: 142159
