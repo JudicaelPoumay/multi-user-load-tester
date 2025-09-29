@@ -1,0 +1,17 @@
+fastapi
+locust
+python-socketio
+aiofiles
+waitress
+Jinja2
+aiohttp
+msal
+werkzeug
+flask-dance
+flask
+python-dotenv
+flask-socketio
+pyjwt
+asgiref
+uvicorn
+eventlet

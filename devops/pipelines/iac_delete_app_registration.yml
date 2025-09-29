@@ -1,0 +1,63 @@
+trigger: none
+
+parameters:
+  - name: environment
+    displayName: 'Environment'
+    type: string
+    values:
+      - 'gtu'
+      - 'tst'
+      - 'uat'
+      - 'ptp'
+      - 'prd'
+    default: 'gtu'
+  - name: region
+    displayName: 'Deploy to region'
+    type: string
+    values:
+      - 'westeurope'
+      - 'northeurope'
+    default: 'westeurope'
+  - name: keyvault
+    type: string
+  - name: purpose
+    type: string
+
+variables:
+  - name: 'shortRegion'
+    ${{ if ne(parameters.region, 'northeurope') }}:
+      value: 'we'
+    ${{ if eq(parameters.region, 'northeurope') }}:
+      value: 'ne'
+  - template: ${{ format('../variables/default_variables_{0}.yml', lower( parameters.environment )) }}
+
+resources:
+  containers:
+    - container: ccoe-product
+      image: ${{variables.agentContainerImage}}
+      endpoint: sc-acr-tooling-prod-${{ variables.applicationCode }}
+  repositories:
+    - repository: devops-template
+      type: git
+      name: geai/devops-template
+
+stages:
+  - stage: removeAppRegistration
+    displayName: 'removeAppRegistration'
+    pool:
+      name: self-hosted-vmss-ubuntu-prd-${{ variables.shortRegion }}
+
+    jobs:
+      - job: removeAppRegistration
+        displayName: removeAppRegistration
+        container: ccoe-product
+        steps:
+            - task: AppRegistration@2
+              inputs:
+                    azureSubscription: ${{ variables.azureSubscription }}
+                    action: 'removeAppRegistration'
+                    environment: ${{ parameters.environment }}
+                    aid: ${{ variables.applicationCode }}
+                    purpose: ${{ parameters.purpose }}
+                    keyVaultName: ${{ parameters.keyvault }}
+                    removeGroups: true

@@ -1,31 +1,27 @@
-FROM python:3.11-slim
+ARG ACR_URL
 
-# Set working directory
-WORKDIR /app
+FROM ${ACR_URL}/shared/belfius/mle/images/python as build-stage
 
-# Copy requirements and install dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+WORKDIR /usr/app
+RUN python -m venv /usr/app/venv
+ENV PATH="/usr/app/venv/bin:$PATH"
 
-# Copy application code
-COPY . .
+# mount azure artifacts secret url and force pip to use it as the default repository
+COPY requirements.txt requirements.txt
+RUN --mount=type=secret,id=PIP_INDEX_URL python -m pip install -r requirements.txt  --index-url $(cat /run/secrets/PIP_INDEX_URL)
 
-# Create non-root user for security
-RUN useradd --create-home --shell /bin/bash appuser && \
-    chown -R appuser:appuser /app
-USER appuser
+# TODO: this should point to a slim version
+FROM ${ACR_URL}/shared/belfius/mle/images/python as final
 
-# Expose only the main application port (NOT the Locust ports)
-EXPOSE 8000
+RUN groupadd -g 999 python && \
+    useradd -r -u 999 -g python python
+RUN mkdir /usr/app && chown -R python:python /usr/app
+WORKDIR /usr/app
 
-# Environment variables
-ENV PYTHONPATH=/app
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+COPY --chown=python:python --from=build-stage /usr/app/venv /usr/app/venv
+COPY --chown=python:python src/src/ .
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:8000/ || exit 1
+USER 999
 
-# Run the application
-CMD ["python", "-m", "app.main"]
+ENV PATH="/usr/app/venv/bin:$PATH"
+CMD ["uvicorn","main:asgi","--host", "0.0.0.0","--port","8080"]
