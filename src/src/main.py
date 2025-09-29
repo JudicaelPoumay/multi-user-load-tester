@@ -68,7 +68,16 @@ CLIENT_ID = os.environ.get("APPLICATION_ID")
 CLIENT_SECRET = os.environ.get("APPLICATION_SECRET")
 TENANT_ID = "83ba98e9-2851-416c-9d81-c0bee20bb7f3"
 AUTHORITY = f"https://login.microsoftonline.com/{TENANT_ID}"
-SCOPE = [os.environ.get("BACKEND_APPLICATION_SCOPE", "api://your-app-id/.default")]
+
+# The backend scope is kept separate, as in the original Flask app's configuration.
+BACKEND_SCOPE = os.environ.get("BACKEND_APPLICATION_SCOPE", "api://your-app-id/.default")
+
+# Scopes for the authorization request, similar to what Flask-Dance requested.
+AUTH_REQUEST_SCOPES = ["openid", "profile", "email"]
+
+# Scopes for the token acquisition, requesting user profile, offline access, and the backend API token.
+TOKEN_ACQUISITION_SCOPES = ["openid", "profile", "email", "offline_access", BACKEND_SCOPE]
+
 REDIRECT_PATH = "/auth/callback"
 
 # Session management
@@ -116,7 +125,7 @@ async def require_auth(request: Request, user: dict = Depends(get_current_user))
 async def login(request: Request):
     session = await get_session(request)
     auth_url_params = {
-        "scope": SCOPE,
+        "scopes": AUTH_REQUEST_SCOPES,
         "response_type": "code",
         "redirect_uri": str(request.url_for('auth_callback')),
     }
@@ -135,7 +144,7 @@ async def auth_callback(request: Request, code: str, state: str):
     try:
         token_response = msal_client.acquire_token_by_authorization_code(
             code,
-            scopes=SCOPE,
+            scopes=TOKEN_ACQUISITION_SCOPES,
             redirect_uri=str(request.url_for('auth_callback'))
         )
 
@@ -145,6 +154,7 @@ async def auth_callback(request: Request, code: str, state: str):
                 "name": id_token_claims.get("name"),
                 "email": id_token_claims.get("preferred_username"),
                 "oid": id_token_claims.get("oid"),
+                "userid": id_token_claims.get("mailnickname"),
                 "roles": id_token_claims.get("roles", []),
             }
             session["access_token"] = token_response["access_token"]
@@ -166,10 +176,10 @@ def check_user_groups_fastapi(user: dict) -> bool:
     if not user:
         return False
 
-    email_nickname = user.get("email", "").split("@")[0].lower()
+    userid = user.get("userid", "").lower()
     ALLOWED_USERS = ["baerta", "poumaj", "poullj"]
 
-    if email_nickname in ALLOWED_USERS:
+    if userid in ALLOWED_USERS:
         return True
 
     required_groups = ['LoadTesterUser']
