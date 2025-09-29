@@ -16,7 +16,7 @@ Author: JudicaelPoumay
 """
 
 from flask import Flask, request, jsonify, render_template, session, has_request_context,redirect, url_for
-from flask_socketio import SocketIO
+from flask_socketio import SocketIO, ASGIApp
 import jwt
 import asyncio
 import json
@@ -41,7 +41,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Socket.IO server setup for real-time communication
-socketio = SocketIO(app, async_mode='eventlet', cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Global session management
 # Dictionary to hold active locust runner instances for each user session
@@ -224,7 +224,7 @@ def handle_connect(sid):
     timeout_tasks[sid] = task
 
 @socketio.on('disconnect')
-def handle_disconnect(sid):
+async def handle_disconnect(sid):
     """
     Handle client disconnections and clean up resources.
     """
@@ -239,7 +239,7 @@ def handle_disconnect(sid):
         runner = runners[sid]
 
         # Stop the Locust subprocess
-        asyncio.run(runner.stop())
+        await runner.stop()
 
         # Clean up session-specific log file
         session_log_file = getattr(runner, '_session_log_file', None)
@@ -256,7 +256,7 @@ def handle_disconnect(sid):
         logger.info(f"Released port for session {sid}")
 
 @socketio.on('start_load_test')
-def handle_start_load_test(sid, data):
+async def handle_start_load_test(sid, data):
     """
     Start a custom load test for a specific user session.
     """
@@ -307,7 +307,7 @@ def handle_start_load_test(sid, data):
             )
 
             # Start the Locust subprocess with the custom configuration
-            asyncio.run(runner.start(host, num_users, spawn_rate, locustfile_content))
+            await runner.start(host, num_users, spawn_rate, locustfile_content)
 
             # Store log file reference for later access via REST API
             runner._session_log_file = log_file_path
@@ -320,7 +320,7 @@ def handle_start_load_test(sid, data):
             socketio.emit('error', {'message': str(e)}, to=sid)
 
 @socketio.on('stop_load_test')
-def handle_stop_load_test(sid):
+async def handle_stop_load_test(sid):
     """
     Stop the load test for a specific user session.
     """
@@ -330,13 +330,13 @@ def handle_stop_load_test(sid):
     runner = runners.get(sid)
     if runner:
         try:
-            asyncio.run(runner.stop())
+            await runner.stop()
         except Exception as e:
             logger.error(f"Error stopping load test for {sid}: {e}")
             socketio.emit('error', {'message': str(e)}, to=sid)
 
 
-asgi = WsgiToAsgi(app)
+asgi = ASGIApp(socketio)
 
 if __name__ == '__main__':
     """
