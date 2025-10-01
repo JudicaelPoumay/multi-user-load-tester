@@ -11,11 +11,19 @@ A multi-user, web-based load testing application powered by FastAPI and Locust. 
 -   **Containerized**: Comes with a `Dockerfile` for easy deployment.
 -   **10-Minute Timeout & Peak Usage Estimator**: Automatically stops tests after 10 minutes and provides a peak usage estimation.
 -   **AAD Token Generator & JWT Decoder**: Includes tools for generating Azure Active Directory tokens and decoding JWTs for testing authenticated endpoints.
--   **SSO Placeholder**: A placeholder for Single Sign-On (SSO) integration is available.
 
 ## How to Run
 
 You can run the application using Docker (recommended) or locally.
+
+### Environment Variables
+
+Before running the application, you may need to configure the following environment variables. You can create a `.env` file in the root of the project to manage these settings.
+
+-   **`SSO_ENABLED`**: Set to `true` to enable Azure AD SSO or `false` to disable it for local development. Defaults to `true`.
+-   **`TENANT_ID`**: Your Azure AD tenant ID. Required if SSO is enabled.
+-   **`CLIENT_ID`**: The Application (client) ID of your Azure AD app registration. Required if SSO is enabled.
+-   **`ALLOWED_USERS`**: A comma-separated list of user principal names (UPNs) that are allowed to access the application (e.g., `"user1@example.com,user2@example.com"`). Required if SSO is enabled.
 
 ### Using Docker
 
@@ -32,6 +40,12 @@ You can run the application using Docker (recommended) or locally.
     docker run -p 8000:8000 locust-web-app
     ```
     The application will be available at `http://localhost:8000`.
+
+When running with Docker, you can pass the environment variables using the `--env-file` option:
+
+```sh
+docker run -p 8000:8000 --env-file .env locust-web-app
+```
 
 ### Locally
 
